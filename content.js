@@ -585,53 +585,143 @@ function showNativeList() {
   }
 }
 
-// --- 菜单注入逻辑 ---
-function setupGlobalClickListener() {
-  // 使用 mousedown 而不是 click，以确保在事件被 Angular 阻止前捕获
-  document.addEventListener('mousedown', (e) => {
-    // 1. 记录最后点击的按钮 (用于 fallback)
-    const btn = e.target.closest('button');
-    if (btn) {
-        state.lastClickedButton = btn;
-        console.log("NotebookLM Extension: Button clicked", btn);
+// --- Services ---
 
-        // [NEW] 策略0: 直接从按钮的 aria-description 获取文件名
-        // NotebookLM 的 "More" 按钮通常在 aria-description 中包含完整的 source title
-        // 这是最准确、最直接的方式，因为它不需要依赖 DOM 结构关系
-        const description = btn.getAttribute('aria-description');
-        if (description && description.trim()) {
-             const text = description.trim();
-             // 过滤掉一些可能的通用描述
-             if (text !== "More" && text !== "Menu" && text.toLowerCase() !== 'edit') {
-                 state.currentMenuFile = text;
-                 console.log("NotebookLM Extension: Captured filename directly from button aria-description:", text);
-                 return; // 直接返回，不再进行不确定的 DOM 推测
-             }
+const DOMService = {
+  /**
+   * Checks if a text is a valid filename and not a UI control label.
+   * Performs strict filtering to avoid capturing "Edit", "More", etc.
+   */
+  isValidFileName(text) {
+    if (!text) return false;
+    const t = text.trim();
+    if (t.length < 1) return false;
+    
+    const lower = t.toLowerCase();
+    const invalidTerms = [
+      'edit', 'more', 'menu', 'delete', 'rename', 'source', 
+      'edit source', 'remove', 'more_vert', 'open_in_new',
+      'check_box_outline_blank', 'check_box', 'add source',
+      'select all sources'
+    ];
+    
+    if (invalidTerms.includes(lower)) {
+        // console.log("[DOMService] Rejected invalid term:", t);
+        return false;
+    }
+    
+    if (lower.startsWith('edit ')) return false; // "Edit source", "Edit file"
+    if (lower.match(/^\d+ days ago$/)) return false; // Date only
+    
+    return true;
+  },
+
+  /**
+   * Extracts filename from a row element with prioritized strategies.
+   * STRICTLY prioritizes .source-title as requested by user.
+   */
+  extractFileName(row) {
+    if (!row) return null;
+
+    // Strategy 1: Direct .source-title (Highest Priority)
+    // The user confirmed: "一个 data 的名字数据都是在这里的" (The name data is right here)
+    const titleSpan = row.querySelector('.source-title');
+    if (titleSpan && this.isValidFileName(titleSpan.textContent)) {
+        console.log("[DOMService] Extracted from .source-title:", titleSpan.textContent.trim());
+        return titleSpan.textContent.trim();
+    }
+
+    // Strategy 2: .single-source-container .source-title
+    // If 'row' is a wrapper that contains the container
+    const singleSourceContainer = row.querySelector('.single-source-container');
+    if (singleSourceContainer) {
+        const title = singleSourceContainer.querySelector('.source-title');
+        if (title && this.isValidFileName(title.textContent)) {
+            console.log("[DOMService] Extracted from .single-source-container:", title.textContent.trim());
+            return title.textContent.trim();
         }
     }
 
-    // 2. 尝试从点击位置向上查找可能的容器
+    // Strategy 3: aria-description on "More" button
+    // This is often a reliable fallback if visual extraction fails
+    const moreBtn = row.querySelector('button[aria-description]');
+    if (moreBtn) {
+        const desc = moreBtn.getAttribute('aria-description');
+        if (this.isValidFileName(desc)) {
+             console.log("[DOMService] Extracted from button aria-description:", desc.trim());
+             return desc.trim();
+        }
+    }
+
+    // Strategy 4: Checkbox aria-label (Select [Filename])
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+        const label = checkbox.getAttribute('aria-label');
+        if (label) {
+            if (label === "Select all sources") return null;
+            if (label.startsWith("Select ")) {
+                const name = label.substring(7).trim();
+                if (this.isValidFileName(name)) return name;
+            }
+            if (this.isValidFileName(label)) return label;
+        }
+    }
+
+    return null;
+  },
+
+  /**
+   * Guesses filename from sibling elements of a clicked target.
+   * Only used as a last resort.
+   */
+  guessFileNameFromSiblings(element) {
+    let current = element;
+    for (let i = 0; i < 3; i++) {
+        if (!current || current === document.body) break;
+        
+        let sibling = current.previousElementSibling;
+        while (sibling) {
+            if (sibling.innerText && this.isValidFileName(sibling.innerText)) {
+                // Ensure we don't pick up "Edit" or "More" that might be in a sibling span
+                return sibling.innerText.split('\n')[0].trim();
+            }
+            sibling = sibling.previousElementSibling;
+        }
+        current = current.parentElement;
+    }
+    return null;
+  }
+};
+
+// --- Menu Injection Logic ---
+function setupGlobalClickListener() {
+  document.addEventListener('mousedown', (e) => {
+    const btn = e.target.closest('button');
+    
+    // 1. Direct aria-description check (Fastest & Most Accurate)
+    if (btn) {
+        state.lastClickedButton = btn;
+        const description = btn.getAttribute('aria-description');
+        if (DOMService.isValidFileName(description)) {
+             state.currentMenuFile = description.trim();
+             console.log("[GlobalListener] Captured from aria-description:", state.currentMenuFile);
+             return;
+        }
+    }
+
+    // 2. Container Traversal
+    // Look for .source-title explicitly in the ancestry
     let target = e.target;
     let container = null;
     
-    // 向上查找 5 层，寻找包含文本的块级元素
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
         if (!target || target === document.body) break;
         
-        // 如果遇到明确的 row 标识
-        if (target.classList.contains('row') || target.getAttribute('role') === 'row') {
-            container = target;
-            break;
-        }
-        
-        // 关键点：支持用户反馈的 single-source-container
-        if (target.classList.contains('single-source-container')) {
-            container = target;
-            break;
-        }
-
-        // 或者只要包含 checkbox 的 div 也可以认为是容器
-        if (target.querySelector('input[type="checkbox"]')) {
+        // If we hit a container that looks like a source row
+        if (target.classList.contains('single-source-container') || 
+            target.classList.contains('row') || 
+            target.getAttribute('role') === 'row' ||
+            (target.tagName === 'DIV' && target.querySelector('.source-title'))) {
             container = target;
             break;
         }
@@ -639,186 +729,30 @@ function setupGlobalClickListener() {
     }
 
     if (container) {
-       // 尝试提取文件名并缓存
-       const fileName = extractFileNameFromRow(container);
+       const fileName = DOMService.extractFileName(container);
        if (fileName) {
            state.currentMenuFile = fileName;
-           console.log("NotebookLM Extension: Captured interaction with file:", fileName);
+           console.log("[GlobalListener] Captured from container:", fileName);
+           return;
        }
-    } else if (btn) {
-        // 如果没找到容器，但点的是按钮，尝试从按钮的兄弟节点找
-        // 通常文件名在按钮的左侧（前面的兄弟节点）
-        const fileName = guessFileNameFromSiblings(btn);
+    } 
+    
+    // 3. Fallback: Sibling Guessing
+    if (btn) {
+        const fileName = DOMService.guessFileNameFromSiblings(btn);
         if (fileName) {
             state.currentMenuFile = fileName;
-            console.log("NotebookLM Extension: Guessed filename from siblings:", fileName);
+            console.log("[GlobalListener] Guessed from siblings:", fileName);
         }
     }
-  }, true); // Capture phase
+  }, true);
 }
 
-function guessFileNameFromSiblings(element) {
-    let current = element;
-    // 向上找几层，每一层都看看前面有没有兄弟节点包含文本
-    for (let i = 0; i < 3; i++) {
-        if (!current || current === document.body) break;
-        
-        let sibling = current.previousElementSibling;
-        while (sibling) {
-            if (sibling.innerText && sibling.innerText.trim().length > 0) {
-                // 排除一些显然不是文件名的词
-                const text = sibling.innerText.trim();
-                const lowerText = text.toLowerCase();
-                
-                // 增加过滤词 "edit" 等
-                if (lowerText !== "more_vert" && 
-                    lowerText !== "source" && 
-                    lowerText !== "edit" && 
-                    lowerText !== "rename" && 
-                    lowerText !== "delete" &&
-                    !lowerText.includes("ago")) {
-                    return text.split('\n')[0].trim();
-                }
-            }
-            sibling = sibling.previousElementSibling;
-        }
-        current = current.parentElement;
-    }
-    return null;
-}
-
+// Delegate legacy calls to DOMService
 function extractFileNameFromRow(row) {
-    // [NEW] 策略0: 查找带有 aria-description 的 More 按钮
-    // 这通常是最准确的元数据，优于视觉文本提取
-    const moreBtn = row.querySelector('button[aria-description]');
-    if (moreBtn) {
-        const desc = moreBtn.getAttribute('aria-description');
-        // 确保描述不是通用的 "More" 或 "Menu"，并且不是 "edit"
-        // 同时确保它看起来像个标题（长度合理，或者不在忽略列表中）
-        if (desc && desc.trim()) {
-            const text = desc.trim();
-            if (text !== "More" && text !== "Menu" && text.toLowerCase() !== 'edit') {
-                 console.log("NotebookLM Extension: Extracted filename from button aria-description:", text);
-                 return text;
-            }
-        }
-    }
-
-    // 策略1: 优先查找可视化的标题元素 (.source-title)
-    // 这是用户所见的内容，最准确
-    const titleSpan = row.querySelector('.source-title');
-    if (titleSpan && titleSpan.textContent.trim()) {
-        const text = titleSpan.textContent.trim();
-        // 再次过滤，以防 source-title 里面恰好是 "edit" (虽然不太可能)
-        if (text.toLowerCase() !== 'edit') {
-            console.log("NotebookLM Extension: Extracted filename from .source-title:", text);
-            return text;
-        }
-    }
-
-    // 策略2: 尝试在 single-source-container 中查找 (如果 row 是更高层级的容器)
-    // 用户反馈的结构中包含 single-source-container
-    const container = row.querySelector ? row.querySelector('.single-source-container') : null;
-    if (container) {
-        const titleInContainer = container.querySelector('.source-title');
-        if (titleInContainer && titleInContainer.textContent.trim()) {
-            const text = titleInContainer.textContent.trim();
-            if (text.toLowerCase() !== 'edit') {
-                 console.log("NotebookLM Extension: Extracted filename from .single-source-container:", text);
-                 return text;
-            }
-        }
-    }
-
-    // 策略3: 查找带有 aria-label 的 checkbox
-    // 注意：aria-label 可能会包含 "Select " 前缀，需要小心处理
-    const checkbox = row.querySelector('input[type="checkbox"]');
-    if (checkbox) {
-        const label = checkbox.getAttribute('aria-label');
-        if (label) {
-            if (label === "Select all sources") return null;
-            if (label.startsWith("Select ")) {
-                // 如果是 "Select filename"，提取 filename
-                // 但要小心不要误判
-                const name = label.substring(7).trim();
-                if (name && name.toLowerCase() !== 'edit') return name;
-            }
-            if (label.toLowerCase() !== 'edit') return label;
-        }
-    }
-    
-    // 策略4: 查找 span[class*="title"] (备用)
-    const backupTitle = row.querySelector('span[class*="title"]');
-    if (backupTitle && backupTitle.textContent.trim()) {
-        const text = backupTitle.textContent.trim();
-        if (text.toLowerCase() !== 'edit') return text;
-    }
-
-    // 策略5: 遍历所有子元素，找第一个看起来像文件名的文本
-    // 使用 TreeWalker 跳过按钮、图标和无关文本
-    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    const candidates = [];
-
-    // 忽略列表 (全小写比对)
-    const ignoreList = new Set([
-        'more_vert', 'check_box_outline_blank', 'check_box', 
-        'edit', 'rename', 'delete', 'remove', 'open_in_new',
-        'source', 'pdf', 'txt', 'audio', 'youtube', 'drive' // 常见类型标识
-    ]);
-
-    while(node = walker.nextNode()) {
-        const text = node.textContent.trim();
-        if (!text) continue;
-        
-        // 1. 检查父元素
-        const parent = node.parentElement;
-        if (!parent) continue;
-        
-        // 忽略按钮内的文本
-        if (parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button') continue;
-        if (parent.closest('button')) continue; // 更彻底的检查
-
-        // 忽略图标
-        if (parent.tagName === 'MAT-ICON' || parent.classList.contains('material-icons') || parent.classList.contains('google-material-icons')) continue;
-        
-        // 忽略特定类名
-        if (parent.classList.contains('nlm-file-tag')) continue; // 忽略我们自己加的标签
-        if (parent.classList.contains('mat-mdc-tooltip-trigger')) {
-             // 如果是 tooltip trigger 且不是 source-title，可能是操作按钮
-             if (!parent.classList.contains('source-title')) continue;
-        }
-
-        // 2. 检查文本内容
-        if (ignoreList.has(text.toLowerCase())) continue;
-        
-        // 3. 过滤掉单纯的日期 (简单判断：包含数字和逗号，或者是 "x days ago")
-        if (text.match(/\d+ days ago/) || text.match(/\d{4}/)) {
-             // 可能是日期，但也可能是文件名包含数字。
-             // 通常文件名在前，日期在后。我们先收集所有候选者。
-        }
-
-        candidates.push(text);
-    }
-
-    // 从候选者中选择
-    if (candidates.length > 0) {
-        // 通常第一个非日期的就是文件名
-        // 这里简单返回第一个，因为我们已经过滤了按钮和图标
-        return candidates[0];
-    }
-
-    // 策略6: 回退到 innerText (最笨的方法)
-    // 尝试按行分割，排除已知无用行
-    const lines = row.innerText.split('\n').map(l => l.trim()).filter(l => l);
-    for (const line of lines) {
-        if (!ignoreList.has(line.toLowerCase()) && !line.includes('days ago')) {
-            return line;
-        }
-    }
-    
-    return null;
+    return DOMService.extractFileName(row);
 }
+
 
 function injectMenuItem(menuNode) {
   // 确保我们操作的是 mat-mdc-menu-content

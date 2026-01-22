@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.10] - 2026-01-22
+### Changed
+- **Refactor**: Introduced `DOMService` pattern to centralize DOM operations and improve maintainability, inspired by Gemini Voyager architecture.
+- **Improvement**: Significantly enhanced filename extraction logic to strictly filter out UI texts like "Edit", "More", "Menu".
+- **Improvement**: Prioritized `.single-source-container` for filename extraction as requested.
+- **Fix**: Resolved issue where "edit" was incorrectly captured as the filename.
+
+## [2.1.10] - 2026-01-22
+### Changed
+- **Refactor**: Introduced `DOMService` pattern to centralize DOM operations and improve maintainability, inspired by Gemini Voyager architecture.
+- **Improvement**: Significantly enhanced filename extraction logic to strictly filter out UI texts like "Edit", "More", "Menu".
+- **Improvement**: Prioritized `.source-title` and `.single-source-container` for filename extraction as requested.
+- **Fix**: Resolved issue where "edit" was incorrectly captured as the filename.
+
 ## [2.1.9] - 2026-01-22
 ### Fixed
 - **Fix**: Changed filename extraction strategy to prioritize `aria-description` from the "More" button.
