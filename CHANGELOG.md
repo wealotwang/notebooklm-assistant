@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2] - 2026-01-22
+### Fixed
+- 紧急修复文件名获取失败问题。
+- 引入全局 `mousedown` 监听器替代 `click`，确保在事件被 Angular 拦截前捕获文件名。
+- 增强文件名提取逻辑 (`extractFileNameFromRow`)，支持多策略（Checkbox aria-label > Title Class > innerText）。
+- 完善日志输出，方便调试文件名捕获过程。
+
 ## [2.0.1] - 2026-01-22
 ### Fixed
 - 修复了上下文菜单（Context Menu）注入不稳定的问题，改用 MutationObserver 实时监听菜单 DOM 变化。

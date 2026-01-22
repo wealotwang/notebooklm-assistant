@@ -313,18 +313,13 @@ function injectMenuItem(menuNode) {
 
       // 如果全局点击监听没有捕获到文件名，尝试进行回退查找
       if (!fileName) {
+          console.log("NotebookLM Extension: Filename missing, attempting fallback...");
           // 策略: 查找当前处于 "expanded" 状态的按钮 (触发菜单的按钮)
           const expandedBtn = document.querySelector('button[aria-expanded="true"]');
           if (expandedBtn) {
               const row = expandedBtn.closest('.row') || expandedBtn.closest('div[role="row"]');
               if (row) {
-                   // 尝试获取文件名 (与 dragstart 逻辑保持一致)
-                   const checkbox = row.querySelector('input[type="checkbox"]');
-                   if (checkbox && checkbox.getAttribute('aria-label')) {
-                       fileName = checkbox.getAttribute('aria-label');
-                   } else {
-                       fileName = row.innerText.split('\n')[0].trim();
-                   }
+                   fileName = extractFileNameFromRow(row);
                    console.log("NotebookLM Extension: Recovered filename from expanded button:", fileName);
               }
           }
@@ -333,7 +328,9 @@ function injectMenuItem(menuNode) {
       if (fileName) {
         showFolderSelectionModal(fileName);
       } else {
-        alert("无法获取文件名，请重试");
+        // 最后一次尝试：提示用户手动输入或报错
+        console.error("NotebookLM Extension: Failed to resolve filename.");
+        alert("无法自动获取文件名。请尝试重新刷新页面。");
       }
   });
   
