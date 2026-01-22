@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.4] - 2026-01-22
+### Fixed
+- **Interaction**: 实现"所见即所得"的文件夹筛选模式。
+  - **Exclusive Selection**: 现在，在文件夹详情视图中勾选任意文件（无论是全选还是单选），系统都会**强制**让 NotebookLM 的选中状态与当前视图完全一致。这意味着未在当前文件夹中被勾选的文件（包括其他文件夹的文件）都会被自动反选。这使用户能快速聚焦于特定文件夹的内容。
+  - **Sync Logic**: 重构了状态同步逻辑 `syncNativeSelectionFromView`，采用全量比对而非增量更新，确保状态绝对准确。
+
 ## [2.1.3] - 2026-01-22
 ### Fixed
 - **Interaction**: 深度优化“全选”联动逻辑，基于用户反馈的 Angular Material DOM 结构进行了适配。

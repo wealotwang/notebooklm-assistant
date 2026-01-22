@@ -352,53 +352,67 @@ function renderFolders() {
 }
 
 // --- 原生选择同步辅助函数 ---
-function clearNativeSelection() {
-    // 1. 尝试找到 "Select all" header checkbox
-    // 使用更精确的 aria-label 选择器 (基于用户提供的 DOM 截图)
-    const selectAllInput = document.querySelector('input[type="checkbox"][aria-label="Select all sources"]');
-    if (selectAllInput) {
-        if (isChecked(selectAllInput)) {
-            safeClick(selectAllInput);
-            return;
-        }
-    }
-    
-    // Fallback: 遍历所有行取消选中
+// 新：基于视图状态的全量同步（实现"独占/排他"选择逻辑）
+function syncNativeSelectionFromView(view) {
+    // 1. 获取 View 中所有被选中的文件名
+    const selectedFiles = new Set(
+        Array.from(view.querySelectorAll('.nlm-file-checkbox:checked'))
+             .map(cb => cb.dataset.file)
+    );
+
+    // 2. 遍历原生列表，强制同步状态
     const rows = document.querySelectorAll('.row, div[role="row"]');
     rows.forEach(row => {
-         if (row.closest('.nlm-folder-container')) return; // 忽略我们自己的容器
-         
-         // 忽略 header
+        if (row.closest('.nlm-folder-container')) return;
+        
+        // 忽略 header (Select all sources)
+        // 即使 extractFileNameFromRow 会返回 "Select all sources"，我们也应该显式跳过，避免将其视为普通文件
+        if (row.querySelector('input[aria-label="Select all sources"]')) {
+            // 特殊处理 Header: 如果我们的 View 并没有选中所有文件（通常是子集），
+            // 那么 Header 的全选状态应该被取消，以保持一致性。
+            // 这里简单处理：只要触发了同步，就意味着进入了"文件夹筛选模式"，取消全局全选总是安全的。
+            const headerCb = row.querySelector('input[type="checkbox"]');
+            if (headerCb && isChecked(headerCb)) {
+                safeClick(headerCb);
+            }
+            return;
+        }
+
+        const fileName = extractFileNameFromRow(row);
+        if (!fileName) return;
+
+        const shouldBeSelected = selectedFiles.has(fileName);
+        const cb = row.querySelector('input[type="checkbox"]');
+        
+        if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox')) {
+            const isCurrentlySelected = isChecked(cb);
+            if (isCurrentlySelected !== shouldBeSelected) {
+                safeClick(cb);
+            }
+        }
+    });
+}
+
+function clearNativeSelection() {
+    // 保留此函数用于"全选"时的清理，虽然 syncNativeSelectionFromView 也能覆盖此逻辑，
+    // 但为了逻辑清晰，或者全选时我们可以直接构造一个全量的 Set 传给 sync 逻辑。
+    // 实际上，showDetailView 里全选逻辑也可以用 syncNativeSelectionFromView 接管。
+    // 暂时保留，以防万一。
+    const selectAllInput = document.querySelector('input[type="checkbox"][aria-label="Select all sources"]');
+    if (selectAllInput && isChecked(selectAllInput)) {
+        safeClick(selectAllInput);
+    }
+    
+    const rows = document.querySelectorAll('.row, div[role="row"]');
+    rows.forEach(row => {
+         if (row.closest('.nlm-folder-container')) return;
          if (row.querySelector('input[aria-label="Select all sources"]')) return;
          
          const cb = row.querySelector('input[type="checkbox"]');
-         // 确保操作的是原生 checkbox
          if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && isChecked(cb)) {
              safeClick(cb);
          }
     });
-}
-
-function setNativeSelection(fileName, select) {
-    const rows = document.querySelectorAll('.row, div[role="row"]');
-    for (let row of rows) {
-        if (row.closest('.nlm-folder-container')) continue;
-        
-        // 检查是否是 Header (通过 aria-label 判断更准)
-        if (row.querySelector('input[aria-label="Select all sources"]')) continue;
-
-        const rowFileName = extractFileNameFromRow(row);
-        if (rowFileName === fileName) {
-            const cb = row.querySelector('input[type="checkbox"]');
-            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox')) {
-                const currentlyChecked = isChecked(cb);
-                if (currentlyChecked !== select) {
-                    safeClick(cb);
-                }
-            }
-            break; 
-        }
-    }
 }
 
 function isNativeSelected(fileName) {
@@ -470,31 +484,21 @@ function safeClick(element) {
           const checkboxes = view.querySelectorAll('.nlm-file-checkbox');
           checkboxes.forEach(cb => cb.checked = isChecked);
           
-          // 同步到原生列表
-          if (isChecked) {
-              // 全选：先清空原生选择，再选中当前文件夹内的文件
-              clearNativeSelection();
-              filesInFolder.forEach(file => setNativeSelection(file, true));
-          } else {
-              // 取消全选：取消当前文件夹内文件的选中状态
-              filesInFolder.forEach(file => setNativeSelection(file, false));
-          }
+          // 同步到原生列表 (全量同步)
+          syncNativeSelectionFromView(view);
       });
   }
   
   // 绑定单个文件 Checkbox 变化
   view.addEventListener('change', (e) => {
       if (e.target.classList.contains('nlm-file-checkbox')) {
-          const fileName = e.target.dataset.file;
-          const isChecked = e.target.checked;
-          
-          // 如果是单个点击，不强制清空其他选择，只是同步当前文件的状态
-          setNativeSelection(fileName, isChecked);
-          
           // 更新全选框状态
           const all = view.querySelectorAll('.nlm-file-checkbox');
           const allChecked = Array.from(all).every(cb => cb.checked);
           if (selectAllCb) selectAllCb.checked = allChecked;
+
+          // 同步到原生列表 (全量同步)
+          syncNativeSelectionFromView(view);
       }
   });
 
