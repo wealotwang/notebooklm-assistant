@@ -47,13 +47,41 @@ function saveData() {
 // --- DOM 监听 ---
 function startObserver() {
   const observer = new MutationObserver((mutations) => {
+    let shouldUpdateDraggable = false;
+    let shouldUpdateBatch = false;
+    let shouldUpdateTags = false;
+
     mutations.forEach(mutation => {
+      // 0. 忽略我们自己 UI 元素的变动，防止死循环
+      if (mutation.target.closest && (
+          mutation.target.closest('.nlm-batch-toolbar') || 
+          mutation.target.closest('.nlm-folder-container') ||
+          mutation.target.closest('.nlm-modal-overlay') ||
+          mutation.target.closest('.nlm-tags-container') // 忽略标签容器
+      )) return;
+      
+      if (mutation.target.classList && (
+          mutation.target.classList.contains('nlm-batch-checkbox') ||
+          mutation.target.classList.contains('nlm-file-tag')
+      )) return;
+
+      // 检查新增节点是否包含我们的元素
+      const isInternalChange = Array.from(mutation.addedNodes).some(node => 
+        node.nodeType === 1 && (
+            node.classList.contains('nlm-batch-checkbox') ||
+            node.classList.contains('nlm-file-tag') ||
+            node.classList.contains('nlm-folder-container') ||
+            node.classList.contains('nlm-tags-container')
+        )
+      );
+      if (isInternalChange) return;
+
       // 1. 检查是否需要注入文件夹 UI
       if (!document.querySelector('.nlm-folder-container')) {
         const injectionPoint = findInjectionPoint();
         if (injectionPoint) {
           injectFolderUI(injectionPoint);
-          makeSourcesDraggable();
+          shouldUpdateDraggable = true;
         }
       }
       
@@ -70,20 +98,34 @@ function startObserver() {
             if (menuContent) {
               injectMenuItem(menuContent);
             }
+            
+            // 标记需要更新
+            shouldUpdateDraggable = true;
+            shouldUpdateTags = true;
+            if (state.isBatchMode) shouldUpdateBatch = true;
           }
         });
       }
     });
 
-    // 持续监听新元素以绑定拖拽
-    makeSourcesDraggable();
-    
-    // 如果处于批量模式，确保新加载的行也有 Checkbox
-    if (state.isBatchMode) {
-        updateBatchUI();
+    // 批量执行更新
+    if (shouldUpdateDraggable) makeSourcesDraggable();
+    if (shouldUpdateBatch) updateBatchUI();
+    if (shouldUpdateTags || document.querySelectorAll('.row, div[role="row"]').length > 0) {
+        // 总是尝试更新标签，因为初始化时也需要
+        // 使用 debounce 避免过于频繁
+        if (!state.renderTagsTimer) {
+            state.renderTagsTimer = setTimeout(() => {
+                renderFileTags();
+                state.renderTagsTimer = null;
+            }, 100);
+        }
     }
   });
   observer.observe(document.body, { childList: true, subtree: true });
+  
+  // 初始调用一次
+  renderFileTags();
 }
 
 function findInjectionPoint() {
@@ -322,7 +364,10 @@ function showDetailView(folder) {
   view.innerHTML = `
     <div class="nlm-detail-header">
       <span style="font-weight:bold; font-size:16px;">${folder.name} (${filesInFolder.length})</span>
-      <div class="nlm-detail-actions">
+      <div class="nlm-detail-actions" style="display:flex; align-items:center;">
+        <label class="nlm-select-all-label" style="margin-right: 12px; display: flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer;">
+            <input type="checkbox" id="nlm-select-all-detail"> 全选
+        </label>
         <button class="nlm-btn" id="nlm-batch-remove">移出文件夹</button>
       </div>
     </div>
@@ -338,6 +383,14 @@ function showDetailView(folder) {
   `;
 
   // 绑定批量操作
+  const selectAllCb = view.querySelector('#nlm-select-all-detail');
+  if (selectAllCb) {
+      selectAllCb.addEventListener('change', (e) => {
+          const checkboxes = view.querySelectorAll('.nlm-file-checkbox');
+          checkboxes.forEach(cb => cb.checked = e.target.checked);
+      });
+  }
+
   document.getElementById('nlm-batch-remove')?.addEventListener('click', () => {
     const checked = Array.from(view.querySelectorAll('.nlm-file-checkbox:checked')).map(cb => cb.dataset.file);
     if (checked.length === 0) return alert('请先选择文件');
@@ -347,8 +400,51 @@ function showDetailView(folder) {
       });
       saveData();
       showDetailView(folder); // 刷新视图
+      renderFileTags(); // 更新主列表标签
     }
   });
+}
+
+function renderFileTags() {
+    const rows = document.querySelectorAll('.row, div[role="row"]');
+    rows.forEach(row => {
+        if (row.innerText.includes('Select all sources')) return;
+        
+        const fileName = extractFileNameFromRow(row);
+        if (!fileName) return;
+        
+        const folderIds = state.fileMappings[fileName] || [];
+        
+        let container = row.querySelector('.nlm-tags-container');
+        
+        if (folderIds.length === 0) {
+            if (container) container.remove();
+            return;
+        }
+        
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'nlm-tags-container';
+            // 尝试插入到菜单按钮之前，或者作为倒数第二个元素
+            // NotebookLM 的 row 通常是 Flex 布局，直接 append 可能在最后
+            // 菜单按钮通常是最后一个
+            const menuBtn = row.querySelector('button[aria-haspopup="menu"]') || row.querySelector('button:last-child');
+            if (menuBtn && menuBtn.parentElement === row) {
+                 row.insertBefore(container, menuBtn);
+            } else {
+                 row.appendChild(container);
+            }
+        }
+        
+        const folderNames = folderIds.map(id => {
+            const f = state.folders.find(fold => fold.id === id);
+            return f ? f.name : null;
+        }).filter(Boolean);
+        
+        container.innerHTML = folderNames.map(name => 
+            `<span class="nlm-file-tag">${name}</span>`
+        ).join('');
+    });
 }
 
 function hideDetailView() {
