@@ -351,45 +351,136 @@ function renderFolders() {
   });
 }
 
-// --- 详情视图 (独立 List) ---
-function showDetailView(folder) {
-  const view = document.getElementById('nlm-detail-view');
-  view.style.display = 'block';
-  
-  // 找出属于该文件夹的文件
-  const filesInFolder = Object.keys(state.fileMappings).filter(fileName => 
-    state.fileMappings[fileName].includes(folder.id)
-  );
+// --- 原生选择同步辅助函数 ---
+function clearNativeSelection() {
+    // 1. 尝试找到 "Select all" header checkbox
+    const headerRow = findInjectionPoint();
+    if (headerRow) {
+        const headerCb = headerRow.querySelector('input[type="checkbox"]');
+        if (headerCb) {
+             if (headerCb.checked) {
+                 headerCb.click(); // 取消全选
+                 return;
+             }
+        }
+    }
+    
+    // Fallback: 遍历所有行取消选中
+    const rows = document.querySelectorAll('.row, div[role="row"]');
+    rows.forEach(row => {
+         if (row === headerRow) return;
+         if (row.closest('.nlm-folder-container')) return; // 忽略我们自己的容器
+         
+         const cb = row.querySelector('input[type="checkbox"]');
+         // 确保操作的是原生 checkbox，不是我们的 batch checkbox
+         if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked) {
+             cb.click();
+         }
+    });
+}
 
-  view.innerHTML = `
-    <div class="nlm-detail-header">
-      <span style="font-weight:bold; font-size:16px;">${folder.name} (${filesInFolder.length})</span>
-      <div class="nlm-detail-actions" style="display:flex; align-items:center;">
-        <label class="nlm-select-all-label" style="margin-right: 12px; display: flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer;">
-            <input type="checkbox" id="nlm-select-all-detail"> 全选
-        </label>
-        <button class="nlm-btn" id="nlm-batch-remove">移出文件夹</button>
-      </div>
-    </div>
-    <ul class="nlm-file-list">
-      ${filesInFolder.map(file => `
-        <li class="nlm-file-item">
-          <input type="checkbox" class="nlm-file-checkbox" data-file="${file}">
-          <span class="nlm-file-name">${file}</span>
-        </li>
-      `).join('')}
-    </ul>
-    ${filesInFolder.length === 0 ? '<div style="color:#999; padding:20px; text-align:center">暂无文件，请从全部列表拖拽添加，或使用菜单添加。</div>' : ''}
-  `;
+function setNativeSelection(fileName, select) {
+    const rows = document.querySelectorAll('.row, div[role="row"]');
+    for (let row of rows) {
+        if (row.closest('.nlm-folder-container')) continue;
+        
+        // 检查是否是 Header
+        const headerRow = findInjectionPoint();
+        if (row === headerRow) continue;
+
+        const rowFileName = extractFileNameFromRow(row);
+        if (rowFileName === fileName) {
+            const cb = row.querySelector('input[type="checkbox"]');
+            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked !== select) {
+                cb.click();
+            }
+            break; 
+        }
+    }
+ }
+ 
+ function isNativeSelected(fileName) {
+    const rows = document.querySelectorAll('.row, div[role="row"]');
+    for (let row of rows) {
+        if (row.closest('.nlm-folder-container')) continue;
+        const headerRow = findInjectionPoint();
+        if (row === headerRow) continue;
+        
+        const rowFileName = extractFileNameFromRow(row);
+        if (rowFileName === fileName) {
+            const cb = row.querySelector('input[type="checkbox"]');
+            return cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked;
+        }
+    }
+    return false;
+}
+
+ // --- 详情视图 (独立 List) ---
+ function showDetailView(folder) {
+   const view = document.getElementById('nlm-detail-view');
+   view.style.display = 'block';
+   
+   // 找出属于该文件夹的文件
+   const filesInFolder = Object.keys(state.fileMappings).filter(fileName => 
+     state.fileMappings[fileName].includes(folder.id)
+   );
+ 
+   view.innerHTML = `
+     <div class="nlm-detail-header">
+       <span style="font-weight:bold; font-size:16px;">${folder.name} (${filesInFolder.length})</span>
+       <div class="nlm-detail-actions" style="display:flex; align-items:center;">
+         <label class="nlm-select-all-label" style="margin-right: 12px; display: flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer;">
+             <input type="checkbox" id="nlm-select-all-detail"> 全选
+         </label>
+         <button class="nlm-btn" id="nlm-batch-remove">移出文件夹</button>
+       </div>
+     </div>
+     <ul class="nlm-file-list">
+       ${filesInFolder.map(file => `
+         <li class="nlm-file-item">
+           <input type="checkbox" class="nlm-file-checkbox" data-file="${file}" ${isNativeSelected(file) ? 'checked' : ''}>
+           <span class="nlm-file-name">${file}</span>
+         </li>
+       `).join('')}
+     </ul>
+     ${filesInFolder.length === 0 ? '<div style="color:#999; padding:20px; text-align:center">暂无文件，请从全部列表拖拽添加，或使用菜单添加。</div>' : ''}
+   `;
 
   // 绑定批量操作
   const selectAllCb = view.querySelector('#nlm-select-all-detail');
   if (selectAllCb) {
       selectAllCb.addEventListener('change', (e) => {
+          const isChecked = e.target.checked;
           const checkboxes = view.querySelectorAll('.nlm-file-checkbox');
-          checkboxes.forEach(cb => cb.checked = e.target.checked);
+          checkboxes.forEach(cb => cb.checked = isChecked);
+          
+          // 同步到原生列表
+          if (isChecked) {
+              // 全选：先清空原生选择，再选中当前文件夹内的文件
+              clearNativeSelection();
+              filesInFolder.forEach(file => setNativeSelection(file, true));
+          } else {
+              // 取消全选：取消当前文件夹内文件的选中状态
+              filesInFolder.forEach(file => setNativeSelection(file, false));
+          }
       });
   }
+  
+  // 绑定单个文件 Checkbox 变化
+  view.addEventListener('change', (e) => {
+      if (e.target.classList.contains('nlm-file-checkbox')) {
+          const fileName = e.target.dataset.file;
+          const isChecked = e.target.checked;
+          
+          // 如果是单个点击，不强制清空其他选择，只是同步当前文件的状态
+          setNativeSelection(fileName, isChecked);
+          
+          // 更新全选框状态
+          const all = view.querySelectorAll('.nlm-file-checkbox');
+          const allChecked = Array.from(all).every(cb => cb.checked);
+          if (selectAllCb) selectAllCb.checked = allChecked;
+      }
+  });
 
   document.getElementById('nlm-batch-remove')?.addEventListener('click', () => {
     const checked = Array.from(view.querySelectorAll('.nlm-file-checkbox:checked')).map(cb => cb.dataset.file);
@@ -557,7 +648,7 @@ function extractFileNameFromRow(row) {
     // 策略2: 查找特定的 title class
     const titleSpan = row.querySelector('.source-title') || row.querySelector('span[class*="title"]');
     if (titleSpan) {
-        return titleSpan.innerText.trim();
+        return titleSpan.textContent.trim();
     }
 
     // 策略3: 遍历所有子元素，找第一个看起来像文件名的文本
