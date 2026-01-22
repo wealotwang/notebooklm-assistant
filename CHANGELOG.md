@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.9] - 2026-01-22
+### Fixed
+- **Fix**: Changed filename extraction strategy to prioritize `aria-description` from the "More" button.
+- **Improvement**: Added direct extraction from the clicked button in the global listener to bypass DOM traversal issues.
+- **Improvement**: Updated `extractFileNameFromRow` to also look for `aria-description` within the row.
+
 ## [2.1.8] - 2026-01-22
 ### Fixed
 - **Interaction Accuracy**: 修复了“移动到文件夹”菜单操作时无法获取正确文件名的问题。

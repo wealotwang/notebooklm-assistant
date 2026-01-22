@@ -594,6 +594,20 @@ function setupGlobalClickListener() {
     if (btn) {
         state.lastClickedButton = btn;
         console.log("NotebookLM Extension: Button clicked", btn);
+
+        // [NEW] 策略0: 直接从按钮的 aria-description 获取文件名
+        // NotebookLM 的 "More" 按钮通常在 aria-description 中包含完整的 source title
+        // 这是最准确、最直接的方式，因为它不需要依赖 DOM 结构关系
+        const description = btn.getAttribute('aria-description');
+        if (description && description.trim()) {
+             const text = description.trim();
+             // 过滤掉一些可能的通用描述
+             if (text !== "More" && text !== "Menu" && text.toLowerCase() !== 'edit') {
+                 state.currentMenuFile = text;
+                 console.log("NotebookLM Extension: Captured filename directly from button aria-description:", text);
+                 return; // 直接返回，不再进行不确定的 DOM 推测
+             }
+        }
     }
 
     // 2. 尝试从点击位置向上查找可能的容器
@@ -674,6 +688,22 @@ function guessFileNameFromSiblings(element) {
 }
 
 function extractFileNameFromRow(row) {
+    // [NEW] 策略0: 查找带有 aria-description 的 More 按钮
+    // 这通常是最准确的元数据，优于视觉文本提取
+    const moreBtn = row.querySelector('button[aria-description]');
+    if (moreBtn) {
+        const desc = moreBtn.getAttribute('aria-description');
+        // 确保描述不是通用的 "More" 或 "Menu"，并且不是 "edit"
+        // 同时确保它看起来像个标题（长度合理，或者不在忽略列表中）
+        if (desc && desc.trim()) {
+            const text = desc.trim();
+            if (text !== "More" && text !== "Menu" && text.toLowerCase() !== 'edit') {
+                 console.log("NotebookLM Extension: Extracted filename from button aria-description:", text);
+                 return text;
+            }
+        }
+    }
+
     // 策略1: 优先查找可视化的标题元素 (.source-title)
     // 这是用户所见的内容，最准确
     const titleSpan = row.querySelector('.source-title');
