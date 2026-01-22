@@ -354,27 +354,27 @@ function renderFolders() {
 // --- 原生选择同步辅助函数 ---
 function clearNativeSelection() {
     // 1. 尝试找到 "Select all" header checkbox
-    const headerRow = findInjectionPoint();
-    if (headerRow) {
-        const headerCb = headerRow.querySelector('input[type="checkbox"]');
-        if (headerCb) {
-             if (headerCb.checked) {
-                 headerCb.click(); // 取消全选
-                 return;
-             }
+    // 使用更精确的 aria-label 选择器 (基于用户提供的 DOM 截图)
+    const selectAllInput = document.querySelector('input[type="checkbox"][aria-label="Select all sources"]');
+    if (selectAllInput) {
+        if (isChecked(selectAllInput)) {
+            safeClick(selectAllInput);
+            return;
         }
     }
     
     // Fallback: 遍历所有行取消选中
     const rows = document.querySelectorAll('.row, div[role="row"]');
     rows.forEach(row => {
-         if (row === headerRow) return;
          if (row.closest('.nlm-folder-container')) return; // 忽略我们自己的容器
          
+         // 忽略 header
+         if (row.querySelector('input[aria-label="Select all sources"]')) return;
+         
          const cb = row.querySelector('input[type="checkbox"]');
-         // 确保操作的是原生 checkbox，不是我们的 batch checkbox
-         if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked) {
-             cb.click();
+         // 确保操作的是原生 checkbox
+         if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && isChecked(cb)) {
+             safeClick(cb);
          }
     });
 }
@@ -384,35 +384,51 @@ function setNativeSelection(fileName, select) {
     for (let row of rows) {
         if (row.closest('.nlm-folder-container')) continue;
         
-        // 检查是否是 Header
-        const headerRow = findInjectionPoint();
-        if (row === headerRow) continue;
+        // 检查是否是 Header (通过 aria-label 判断更准)
+        if (row.querySelector('input[aria-label="Select all sources"]')) continue;
 
         const rowFileName = extractFileNameFromRow(row);
         if (rowFileName === fileName) {
             const cb = row.querySelector('input[type="checkbox"]');
-            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked !== select) {
-                cb.click();
+            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox')) {
+                const currentlyChecked = isChecked(cb);
+                if (currentlyChecked !== select) {
+                    safeClick(cb);
+                }
             }
             break; 
         }
     }
- }
- 
- function isNativeSelected(fileName) {
+}
+
+function isNativeSelected(fileName) {
     const rows = document.querySelectorAll('.row, div[role="row"]');
     for (let row of rows) {
         if (row.closest('.nlm-folder-container')) continue;
-        const headerRow = findInjectionPoint();
-        if (row === headerRow) continue;
+        if (row.querySelector('input[aria-label="Select all sources"]')) continue;
         
         const rowFileName = extractFileNameFromRow(row);
         if (rowFileName === fileName) {
             const cb = row.querySelector('input[type="checkbox"]');
-            return cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && cb.checked;
+            return cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && isChecked(cb);
         }
     }
     return false;
+}
+
+// 辅助：检查 Checkbox 是否选中 (兼容 Angular Material/MDC)
+function isChecked(checkbox) {
+    return checkbox.checked || 
+           checkbox.classList.contains('mdc-checkbox--selected') || 
+           checkbox.getAttribute('aria-checked') === 'true';
+}
+
+// 辅助：安全点击 (兼容框架事件监听)
+function safeClick(element) {
+    element.click();
+    // 某些框架可能监听 input 事件或 change 事件
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
  // --- 详情视图 (独立 List) ---

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3] - 2026-01-22
+### Fixed
+- **Interaction**: 深度优化“全选”联动逻辑，基于用户反馈的 Angular Material DOM 结构进行了适配。
+  - **Selector Accuracy**: 改用 `aria-label="Select all sources"` 精确查找全局全选框，解决了之前基于文本查找可能失效的问题。
+  - **Event Simulation**: 升级了点击模拟逻辑 `safeClick`，除了 `click()` 还会分发 `change`/`input` 事件，确保能触发 Angular/MDC 的状态变更。
+  - **State Detection**: 增强了复选框状态检测 `isChecked`，现在会同时检查 `.checked` 属性、`mdc-checkbox--selected` 类名和 `aria-checked` 属性，确保在所有状态下都能正确判断。
+
 ## [2.1.2] - 2026-01-22
 ### Fixed
 - **Interaction**: 修复了文件夹详情视图中“全选”功能未与 NotebookLM 原生选择联动的问题。
