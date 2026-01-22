@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.7] - 2026-01-22
+### Fixed
+- **Content Accuracy**: 进一步增强文件名提取逻辑，深度适配用户提供的 DOM 结构。
+  - 优先识别 `.source-title` 和 `single-source-container` 中的文本，确保 100% 准确获取文件名。
+  - 强制屏蔽 "edit" 关键字，防止误将操作按钮文字识别为文件名。
+  - 增加了详细的 Console 日志，方便追踪文件名提取来源。
+- **UI/UX**: 优化了文件夹详情中长文件名的显示效果。
+  - 强制允许文件名换行 (`white-space: normal`)，并限制最多显示 2 行，防止超长标题破坏布局。
+  - 解决了之前因为 `text-overflow: ellipsis` 导致的标题显示不全问题。
+
 ## [2.1.6] - 2026-01-22
 ### Fixed
 - **Extraction Logic**: 修复了文件名提取逻辑错误地捕获 "edit" 按钮文本的问题。

@@ -310,7 +310,10 @@
   color: #3c4043;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* white-space: nowrap;  移除 nowrap，允许换行 */
+  white-space: normal; /* 强制允许换行 */
   word-break: break-word; /* 允许在单词内换行，防止长标题溢出 */
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* 最多显示2行 */
+  -webkit-box-orient: vertical;
 }

@@ -662,11 +662,30 @@ function extractFileNameFromRow(row) {
     // 策略1: 优先查找可视化的标题元素 (.source-title)
     // 这是用户所见的内容，最准确
     const titleSpan = row.querySelector('.source-title');
-    if (titleSpan) {
-        return titleSpan.textContent.trim();
+    if (titleSpan && titleSpan.textContent.trim()) {
+        const text = titleSpan.textContent.trim();
+        // 再次过滤，以防 source-title 里面恰好是 "edit" (虽然不太可能)
+        if (text.toLowerCase() !== 'edit') {
+            console.log("NotebookLM Extension: Extracted filename from .source-title:", text);
+            return text;
+        }
     }
 
-    // 策略2: 查找带有 aria-label 的 checkbox
+    // 策略2: 尝试在 single-source-container 中查找 (如果 row 是更高层级的容器)
+    // 用户反馈的结构中包含 single-source-container
+    const container = row.querySelector ? row.querySelector('.single-source-container') : null;
+    if (container) {
+        const titleInContainer = container.querySelector('.source-title');
+        if (titleInContainer && titleInContainer.textContent.trim()) {
+            const text = titleInContainer.textContent.trim();
+            if (text.toLowerCase() !== 'edit') {
+                 console.log("NotebookLM Extension: Extracted filename from .single-source-container:", text);
+                 return text;
+            }
+        }
+    }
+
+    // 策略3: 查找带有 aria-label 的 checkbox
     // 注意：aria-label 可能会包含 "Select " 前缀，需要小心处理
     const checkbox = row.querySelector('input[type="checkbox"]');
     if (checkbox) {
@@ -677,19 +696,20 @@ function extractFileNameFromRow(row) {
                 // 如果是 "Select filename"，提取 filename
                 // 但要小心不要误判
                 const name = label.substring(7).trim();
-                if (name) return name;
+                if (name && name.toLowerCase() !== 'edit') return name;
             }
-            return label;
+            if (label.toLowerCase() !== 'edit') return label;
         }
     }
     
-    // 策略3: 查找 span[class*="title"] (备用)
+    // 策略4: 查找 span[class*="title"] (备用)
     const backupTitle = row.querySelector('span[class*="title"]');
-    if (backupTitle) {
-        return backupTitle.textContent.trim();
+    if (backupTitle && backupTitle.textContent.trim()) {
+        const text = backupTitle.textContent.trim();
+        if (text.toLowerCase() !== 'edit') return text;
     }
 
-    // 策略4: 遍历所有子元素，找第一个看起来像文件名的文本
+    // 策略5: 遍历所有子元素，找第一个看起来像文件名的文本
     // 使用 TreeWalker 跳过按钮、图标和无关文本
     const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null, false);
     let node;
@@ -719,7 +739,11 @@ function extractFileNameFromRow(row) {
         
         // 忽略特定类名
         if (parent.classList.contains('nlm-file-tag')) continue; // 忽略我们自己加的标签
-        
+        if (parent.classList.contains('mat-mdc-tooltip-trigger')) {
+             // 如果是 tooltip trigger 且不是 source-title，可能是操作按钮
+             if (!parent.classList.contains('source-title')) continue;
+        }
+
         // 2. 检查文本内容
         if (ignoreList.has(text.toLowerCase())) continue;
         
@@ -739,7 +763,7 @@ function extractFileNameFromRow(row) {
         return candidates[0];
     }
 
-    // 策略5: 回退到 innerText (最笨的方法)
+    // 策略6: 回退到 innerText (最笨的方法)
     // 尝试按行分割，排除已知无用行
     const lines = row.innerText.split('\n').map(l => l.trim()).filter(l => l);
     for (const line of lines) {
