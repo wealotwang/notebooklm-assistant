@@ -659,19 +659,30 @@ function guessFileNameFromSiblings(element) {
 }
 
 function extractFileNameFromRow(row) {
-    // 策略1: 优先查找带有 aria-label 的 checkbox (最准确)
-    const checkbox = row.querySelector('input[type="checkbox"]');
-    if (checkbox && checkbox.getAttribute('aria-label')) {
-        return checkbox.getAttribute('aria-label');
-    }
-    
-    // 策略2: 查找特定的 title class
-    const titleSpan = row.querySelector('.source-title') || row.querySelector('span[class*="title"]');
+    // 策略1: 优先查找可视化的标题元素 (.source-title)
+    // 这是用户所见的内容，最准确
+    const titleSpan = row.querySelector('.source-title');
     if (titleSpan) {
         return titleSpan.textContent.trim();
     }
 
-    // 策略3: 遍历所有子元素，找第一个看起来像文件名的文本
+    // 策略2: 查找带有 aria-label 的 checkbox
+    // 注意：aria-label 可能会包含 "Select " 前缀，需要小心处理
+    // 但在 NotebookLM 中，通常它就是文件名
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (checkbox && checkbox.getAttribute('aria-label')) {
+        let label = checkbox.getAttribute('aria-label');
+        if (label === "Select all sources") return null; // 忽略全选框
+        return label;
+    }
+    
+    // 策略3: 查找 span[class*="title"] (备用)
+    const backupTitle = row.querySelector('span[class*="title"]');
+    if (backupTitle) {
+        return backupTitle.textContent.trim();
+    }
+
+    // 策略4: 遍历所有子元素，找第一个看起来像文件名的文本
     // 排除 checkbox, button, icon
     const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null, false);
     let node;

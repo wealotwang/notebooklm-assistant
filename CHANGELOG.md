@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.5] - 2026-01-22
+### Fixed
+- **Content Accuracy**: 优化了文件名的提取逻辑，现在优先从 `.source-title` 元素获取标题。
+  - 确保文件夹内显示的文件名与 NotebookLM 原生列表中的 Source Title 完全一致（1:1 展示）。
+  - 解决了之前可能因为从 Checkbox Label 提取而导致标题截断或不准确的问题。
+- **UI/UX**: 文件夹详情视图中的文件名现在支持自动换行 (`word-break: break-word`)，完整展示超长标题，不再截断。
+
 ## [2.1.4] - 2026-01-22
 ### Fixed
 - **Interaction**: 实现"所见即所得"的文件夹筛选模式。
