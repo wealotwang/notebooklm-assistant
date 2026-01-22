@@ -45,13 +45,34 @@ function saveData() {
 // --- DOM 监听 ---
 function startObserver() {
   const observer = new MutationObserver((mutations) => {
-    if (!document.querySelector('.nlm-folder-container')) {
-      const injectionPoint = findInjectionPoint();
-      if (injectionPoint) {
-        injectFolderUI(injectionPoint);
-        makeSourcesDraggable();
+    mutations.forEach(mutation => {
+      // 1. 检查是否需要注入文件夹 UI
+      if (!document.querySelector('.nlm-folder-container')) {
+        const injectionPoint = findInjectionPoint();
+        if (injectionPoint) {
+          injectFolderUI(injectionPoint);
+          makeSourcesDraggable();
+        }
       }
-    }
+      
+      // 2. 检查是否有菜单被添加 (Angular Material Menu)
+      if (mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === 1) { // Element node
+            // 检查直接添加的节点是否是菜单内容
+            if (node.classList && (node.classList.contains('mat-mdc-menu-content') || node.classList.contains('mat-mdc-menu-panel'))) {
+              injectMenuItem(node);
+            }
+            // 或者在子树中查找
+            const menuContent = node.querySelector ? node.querySelector('.mat-mdc-menu-content') : null;
+            if (menuContent) {
+              injectMenuItem(menuContent);
+            }
+          }
+        });
+      }
+    });
+
     // 持续监听新元素以绑定拖拽
     makeSourcesDraggable();
   });
@@ -230,53 +251,94 @@ function showNativeList() {
 // --- 菜单注入逻辑 ---
 function setupGlobalClickListener() {
   document.addEventListener('click', (e) => {
-    // 1. 监听"三个点"按钮点击
-    const moreBtn = e.target.closest('button'); // 假设是 button
-    // 这里需要更精确地判断是否是 Source 列表里的 More 按钮
-    // 我们可以通过寻找其所在的 row 来判断
+    // 1. 监听"三个点"按钮点击 (More options)
+    // 尝试找到触发菜单的按钮，通常有 aria-label="More options" 或类似
+    const moreBtn = e.target.closest('button'); 
+    
     if (moreBtn) {
+       // 尝试找到所在的行
        const row = moreBtn.closest('.row') || moreBtn.closest('div[role="row"]');
-       if (row && row.innerText) {
-           // 记录当前操作的文件名
-           state.currentMenuFile = row.innerText.split('\n')[0].trim();
-           console.log("Clicked menu for:", state.currentMenuFile);
+       if (row) {
+           // 尝试获取文件名
+           // 策略1: 直接从 innerText 获取第一行
+           let fileName = row.innerText.split('\n')[0].trim();
            
-           // 延迟一下等待 Menu 弹出
-           setTimeout(injectMenuItem, 200);
+           // 策略2: 如果有 aria-label 的 checkbox
+           const checkbox = row.querySelector('input[type="checkbox"]');
+           if (checkbox && checkbox.getAttribute('aria-label')) {
+               fileName = checkbox.getAttribute('aria-label');
+           }
+
+           if (fileName) {
+               state.currentMenuFile = fileName;
+               console.log("NotebookLM Extension: Detected click on file:", state.currentMenuFile);
+           }
        }
     }
   }, true); // Capture phase
 }
 
-function injectMenuItem() {
-  // 查找 Angular Material 的 Overlay 容器
-  const overlay = document.querySelector('.cdk-overlay-container');
-  if (!overlay) return;
-  
-  const menuContent = overlay.querySelector('.mat-mdc-menu-content');
-  if (menuContent && !menuContent.querySelector('.nlm-menu-item')) {
-    const separator = document.createElement('div');
-    separator.style.borderTop = '1px solid #eee';
-    separator.style.margin = '4px 0';
-    
-    const menuItem = document.createElement('button');
-    menuItem.className = 'nlm-menu-item';
-    menuItem.innerHTML = `
-      <svg class="nlm-menu-icon" viewBox="0 0 24 24">
-         <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-      </svg>
-      加入文件夹...
-    `;
-    
-    menuItem.addEventListener('click', () => {
-        // 关闭原生菜单（模拟点击背景，或者直接移除 overlay，这里简单起见直接弹窗）
-        // document.body.click(); 
-        showFolderSelectionModal(state.currentMenuFile);
-    });
-    
-    menuContent.appendChild(separator);
-    menuContent.appendChild(menuItem);
+function injectMenuItem(menuNode) {
+  // 确保我们操作的是 mat-mdc-menu-content
+  let menuContent = menuNode;
+  if (!menuContent.classList.contains('mat-mdc-menu-content')) {
+      menuContent = menuNode.querySelector('.mat-mdc-menu-content');
   }
+  if (!menuContent) return;
+
+  // 防止重复注入
+  if (menuContent.querySelector('.nlm-menu-item')) return;
+
+  console.log("NotebookLM Extension: Injecting menu item...");
+
+  const separator = document.createElement('div');
+  separator.style.borderTop = '1px solid #dadce0'; // Google Gray
+  separator.style.margin = '8px 0';
+  
+  const menuItem = document.createElement('button');
+  menuItem.className = 'nlm-menu-item mat-mdc-menu-item'; // 添加原生类名以保持一致性
+  menuItem.innerHTML = `
+    <svg class="nlm-menu-icon" viewBox="0 0 24 24">
+       <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+    </svg>
+    <span class="mdc-list-item__primary-text">移动到文件夹...</span>
+  `;
+  
+  menuItem.addEventListener('click', () => {
+      // 关闭原生菜单 (模拟点击 backdrop)
+      const backdrop = document.querySelector('.cdk-overlay-backdrop');
+      if (backdrop) backdrop.click();
+      
+      let fileName = state.currentMenuFile;
+
+      // 如果全局点击监听没有捕获到文件名，尝试进行回退查找
+      if (!fileName) {
+          // 策略: 查找当前处于 "expanded" 状态的按钮 (触发菜单的按钮)
+          const expandedBtn = document.querySelector('button[aria-expanded="true"]');
+          if (expandedBtn) {
+              const row = expandedBtn.closest('.row') || expandedBtn.closest('div[role="row"]');
+              if (row) {
+                   // 尝试获取文件名 (与 dragstart 逻辑保持一致)
+                   const checkbox = row.querySelector('input[type="checkbox"]');
+                   if (checkbox && checkbox.getAttribute('aria-label')) {
+                       fileName = checkbox.getAttribute('aria-label');
+                   } else {
+                       fileName = row.innerText.split('\n')[0].trim();
+                   }
+                   console.log("NotebookLM Extension: Recovered filename from expanded button:", fileName);
+              }
+          }
+      }
+
+      if (fileName) {
+        showFolderSelectionModal(fileName);
+      } else {
+        alert("无法获取文件名，请重试");
+      }
+  });
+  
+  menuContent.appendChild(separator);
+  menuContent.appendChild(menuItem);
 }
 
 // --- 文件夹选择弹窗 ---

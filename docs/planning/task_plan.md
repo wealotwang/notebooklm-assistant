@@ -13,7 +13,7 @@
 - [x] Implement LocalStorage persistence
 
 ### Phase 2: Refinement & Stability (🚧 In Progress)
-- [ ] **Feature**: Inject "Move to Folder" menu item into native context menu.
+- [x] **Feature**: Inject "Move to Folder" menu item into native context menu.
 - [ ] **Feature**: Batch operations (Select multiple -> Move).
 - [ ] **Feature**: Folder Detail View (List view for batch management).
 - [ ] **Bug Fix**: Ensure reliable file name extraction.
