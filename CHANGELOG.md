@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.1.17] - 2026-01-22
+### Fixed
+- **Sync Architecture**: 彻底重构了双向同步的查找逻辑 (Checkbox-First Approach)。
+  - **Problem**: 之前的版本依赖 `.row` 或 `div[role="row"]` 来定位原生文件，但 NotebookLM 的 DOM 结构可能因搜索、折叠或虚拟渲染而变化，导致 `Native row not found` 错误。
+  - **Solution**: 现在直接遍历页面上所有的 `input[type="checkbox"]`，并从 Checkbox 上下文（如 `aria-label` 或父级结构）反向提取文件名。这种方法不依赖特定的行结构，具有极高的鲁棒性。
+  - **Result**: 彻底解决了单选同步失效的问题，确保在任何 DOM 状态下都能精确定位并同步文件状态。
+
+## [2.1.16] - 2026-01-22
+### Fixed
+- **Sync Robustness**: 增强了文件名的匹配算法 (Fuzzy Matching)。
+  - 引入 `normalizeFileName`，去除文件名中的不可见字符并标准化空格。
+  - 增加了“包含匹配”策略：当 View 和 Native 的文件名因截断或特殊字符不完全一致时，只要相似度高且相互包含，就视为匹配成功。这彻底解决了 `Native row not found` 的问题。
+- **Debug**: 在匹配失败时，日志会输出当前页面上可见的所有文件名，方便进一步排查。
+
+## [2.1.15] - 2026-01-22
+### Fixed
+- **View -> Native Sync**: 彻底重构了文件夹视图的事件绑定逻辑。
+  - 移除了不可靠的事件委托，改为直接绑定 `click` 事件，确保每次点击都能精准触发。
+  - 增强了原生点击模拟 (`safeClick`)，加入了 `mousedown`/`mouseup` 完整流程和 `change`/`input` 事件分发，完美穿透 Angular 的事件拦截。
+- **Native -> View Sync**: 引入了 "Fast Path" 快速同步机制。
+  - 当检测到原生 Checkbox 类名变化时，立即触发点对点的 View 更新，跳过全量同步的 Debounce 延迟，实现了毫秒级的响应速度。
+
+## [2.1.14] - 2026-01-22
+### Fixed
+- **Deep Sync**: 深度修复了所有场景下的双向同步问题。
+  - **Init Sync**: 每次打开文件夹详情视图时，立即从原生列表拉取最新状态，解决“打开即不同步”的问题。
+  - **View -> Native**: 实现了“点对点”的强制同步逻辑。在文件夹中勾选单文件时，会精确定位并点击原生 Checkbox，不再依赖全量扫描，大幅提升 Angular 响应准确性。
+  - **Native -> View**: 增加了反向同步的重试机制（Retry Logic），确保在 DOM 渲染延迟或动画过程中也能正确捕获状态更新。
+
+## [2.1.13] - 2026-01-22
+### Fixed
+- **Bi-directional Sync**: 实现了原生的 "Select all sources" 与插件文件夹视图的完美全选联动。
+  - 现在在原生列表点击全选，插件文件夹内的所有文件（及全选框）会立即自动选中。
+  - 修复了原生单选反向同步到插件视图的延迟问题。
+- **Checkbox Detection**: 增强了对 Angular Material 动画中间状态 (`mdc-checkbox--anim-unchecked-checked`) 的捕获，杜绝了点击过快导致的状态脱节。
+- **Debug**: Log Viewer 新增 "DOM Watch" 模式，实时监控 Checkbox 的类名和属性变化。
+
 ## [2.1.12] - 2026-01-22
 ### Fixed
 - **Sync Logic**: 彻底修复了 Checkbox 同步脱节问题。

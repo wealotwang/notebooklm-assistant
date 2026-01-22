@@ -1,4 +1,4 @@
-console.log("NotebookLM Folder Manager: Loaded v2.1.12 (Sync Fixes & Log Viewer)");
+console.log("NotebookLM Folder Manager: Loaded v2.1.17 (Checkbox-First Traversal)");
 
 // --- 全局状态 ---
 let state = {
@@ -50,14 +50,15 @@ function startObserver() {
     let shouldUpdateDraggable = false;
     let shouldUpdateBatch = false;
     let shouldUpdateTags = false;
+    let shouldSyncSelection = false; // New: Sync trigger
 
     mutations.forEach(mutation => {
-      // 0. 忽略我们自己 UI 元素的变动，防止死循环
+      // 0. Ignore internal UI changes
       if (mutation.target.closest && (
           mutation.target.closest('.nlm-batch-toolbar') || 
           mutation.target.closest('.nlm-folder-container') ||
           mutation.target.closest('.nlm-modal-overlay') ||
-          mutation.target.closest('.nlm-tags-container') // 忽略标签容器
+          mutation.target.closest('.nlm-tags-container')
       )) return;
       
       if (mutation.target.classList && (
@@ -65,7 +66,36 @@ function startObserver() {
           mutation.target.classList.contains('nlm-file-tag')
       )) return;
 
-      // 检查新增节点是否包含我们的元素
+      // 1. Attribute changes (Class/Aria) for Syncing
+      if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          
+          // Debug Logging for DOM Watch
+          if (target.tagName === 'INPUT' && target.type === 'checkbox' && !target.classList.contains('nlm-file-checkbox')) {
+               DOMService.log(`[DOM Watch] Input attribute changed: ${mutation.attributeName}`, target.className);
+               
+               // Fast Path: 针对单选框变化，立即触发点对点更新，跳过 Debounce
+               // 通过 DOM 关系找到这一行的文件名
+               const row = target.closest('.row') || target.closest('div[role="row"]');
+               if (row) {
+                   const fileName = extractFileNameFromRow(row);
+                   if (fileName) {
+                       const isCheckedNative = isChecked(target);
+                       updateViewCheckboxState(fileName, isCheckedNative);
+                   }
+               }
+               
+               shouldSyncSelection = true; // 仍然触发全量检查作为兜底
+          }
+          else if (target.tagName === 'MAT-CHECKBOX') {
+               DOMService.log(`[DOM Watch] Mat-Checkbox attribute changed: ${mutation.attributeName}`, target.className);
+               shouldSyncSelection = true;
+          }
+          return; // Skip structural checks for attribute changes
+      }
+
+      // 2. Structural changes (Nodes added/removed)
+      // ... existing logic ...
       const isInternalChange = Array.from(mutation.addedNodes).some(node => 
         node.nodeType === 1 && (
             node.classList.contains('nlm-batch-checkbox') ||
@@ -76,7 +106,6 @@ function startObserver() {
       );
       if (isInternalChange) return;
 
-      // 1. 检查是否需要注入文件夹 UI
       if (!document.querySelector('.nlm-folder-container')) {
         const injectionPoint = findInjectionPoint();
         if (injectionPoint) {
@@ -85,21 +114,16 @@ function startObserver() {
         }
       }
       
-      // 2. 检查是否有菜单被添加 (Angular Material Menu)
       if (mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach(node => {
-          if (node.nodeType === 1) { // Element node
-            // 检查直接添加的节点是否是菜单内容
+          if (node.nodeType === 1) {
             if (node.classList && (node.classList.contains('mat-mdc-menu-content') || node.classList.contains('mat-mdc-menu-panel'))) {
               injectMenuItem(node);
             }
-            // 或者在子树中查找
             const menuContent = node.querySelector ? node.querySelector('.mat-mdc-menu-content') : null;
             if (menuContent) {
               injectMenuItem(menuContent);
             }
-            
-            // 标记需要更新
             shouldUpdateDraggable = true;
             shouldUpdateTags = true;
             if (state.isBatchMode) shouldUpdateBatch = true;
@@ -108,12 +132,19 @@ function startObserver() {
       }
     });
 
-    // 批量执行更新
+    if (shouldSyncSelection) {
+        // Debounce sync to avoid spamming
+        if (!state.syncTimer) {
+            state.syncTimer = setTimeout(() => {
+                syncViewFromNative();
+                state.syncTimer = null;
+            }, 50);
+        }
+    }
+
     if (shouldUpdateDraggable) makeSourcesDraggable();
     if (shouldUpdateBatch) updateBatchUI();
     if (shouldUpdateTags || document.querySelectorAll('.row, div[role="row"]').length > 0) {
-        // 总是尝试更新标签，因为初始化时也需要
-        // 使用 debounce 避免过于频繁
         if (!state.renderTagsTimer) {
             state.renderTagsTimer = setTimeout(() => {
                 renderFileTags();
@@ -122,7 +153,14 @@ function startObserver() {
         }
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Watch attributes for sync, childList for injection
+  observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true, 
+      attributeFilter: ['class', 'aria-checked', 'aria-label'] 
+  });
   
   // 初始调用一次
   renderFileTags();
@@ -393,6 +431,110 @@ function syncNativeSelectionFromView(view) {
     });
 }
 
+// 新：更新 View 中单个 Checkbox 的状态 (Native -> View Fast Path)
+function updateViewCheckboxState(fileName, isChecked) {
+    const view = document.getElementById('nlm-detail-view');
+    if (!view || view.style.display === 'none') return;
+    
+    const cb = view.querySelector(`.nlm-file-checkbox[data-file="${CSS.escape(fileName)}"]`);
+    if (cb && cb.checked !== isChecked) {
+        cb.checked = isChecked;
+        DOMService.log(`[Fast Sync] Updated View Checkbox for "${fileName}" to ${isChecked}`);
+        
+        // 更新全选框
+        const all = view.querySelectorAll('.nlm-file-checkbox');
+        const allChecked = Array.from(all).every(c => c.checked);
+        const selectAllCb = view.querySelector('#nlm-select-all-detail');
+        if (selectAllCb) selectAllCb.checked = allChecked;
+    }
+}
+
+// 新：反向同步（Native -> View）
+// 当原生列表状态变化时，更新 View 中的 Checkbox 状态
+function syncViewFromNative(retryCount = 0) {
+    const view = document.getElementById('nlm-detail-view');
+    // 如果 View 没显示，或者已经被销毁，就不需要同步
+    if (!view || view.style.display === 'none') return;
+    
+    // Retry logic: DOM updates might be slightly delayed
+    if (retryCount > 2) return;
+
+    DOMService.log(`[Sync] Triggering View sync from Native changes... (Attempt ${retryCount + 1})`);
+
+    // 1. Check Global "Select all sources" status
+    const selectAllInput = document.querySelector('input[type="checkbox"][aria-label="Select all sources"]');
+    const isGlobalSelectAllChecked = selectAllInput && isChecked(selectAllInput);
+    
+    // 2. Iterate ALL checkboxes to find native states (Robust Traversal)
+    const nativeStates = {};
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    
+    checkboxes.forEach(cb => {
+        if (cb.classList.contains('nlm-file-checkbox') || cb.classList.contains('nlm-batch-checkbox')) return;
+        if (cb.getAttribute('aria-label') === 'Select all sources') return;
+        
+        const fileName = extractFileNameFromCheckboxContext(cb);
+        if (fileName) {
+             const normalizedName = normalizeFileName(fileName);
+             // Store by normalized name for fuzzy matching lookup
+             nativeStates[normalizedName] = isChecked(cb);
+        }
+    });
+    
+    // 3. Update View Checkboxes
+    const viewCheckboxes = view.querySelectorAll('.nlm-file-checkbox');
+    let allViewChecked = true;
+    let anyUpdate = false;
+    
+    viewCheckboxes.forEach(cb => {
+        const fileName = cb.dataset.file;
+        const normalizedName = normalizeFileName(fileName);
+        let shouldBeChecked = false;
+        
+        if (isGlobalSelectAllChecked) {
+            shouldBeChecked = true;
+        } else {
+            // Fuzzy lookup in nativeStates
+            // Try exact match first
+            if (nativeStates.hasOwnProperty(normalizedName)) {
+                shouldBeChecked = nativeStates[normalizedName];
+            } else {
+                // Try fuzzy match
+                const match = Object.keys(nativeStates).find(key => 
+                    (key.includes(normalizedName) && Math.abs(key.length - normalizedName.length) < 5) ||
+                    (normalizedName.includes(key) && Math.abs(normalizedName.length - key.length) < 5)
+                );
+                if (match) {
+                    shouldBeChecked = nativeStates[match];
+                } else {
+                     // Not found in native list (maybe folded/hidden), keep current state?
+                     // Or assume false if we are confident? 
+                     // Let's keep current state to be safe.
+                     shouldBeChecked = cb.checked; 
+                }
+            }
+        }
+        
+        if (cb.checked !== shouldBeChecked) {
+            cb.checked = shouldBeChecked;
+            anyUpdate = true;
+            DOMService.log(`[Sync] Updated View Checkbox for "${fileName}" to ${shouldBeChecked}`);
+        }
+        
+        if (!shouldBeChecked) allViewChecked = false;
+    });
+    
+    // 4. Update View's "Select All" Checkbox
+    const viewSelectAll = view.querySelector('#nlm-select-all-detail');
+    if (viewSelectAll) {
+        viewSelectAll.checked = (viewCheckboxes.length > 0 && allViewChecked);
+    }
+
+    if (!anyUpdate && retryCount < 1) {
+         setTimeout(() => syncViewFromNative(retryCount + 1), 100);
+    }
+}
+
 function clearNativeSelection() {
     // 保留此函数用于"全选"时的清理，虽然 syncNativeSelectionFromView 也能覆盖此逻辑，
     // 但为了逻辑清晰，或者全选时我们可以直接构造一个全量的 Set 传给 sync 逻辑。
@@ -416,23 +558,28 @@ function clearNativeSelection() {
 }
 
 function isNativeSelected(fileName) {
-    const rows = document.querySelectorAll('.row, div[role="row"]');
-    for (let row of rows) {
-        if (row.closest('.nlm-folder-container')) continue;
-        if (row.querySelector('input[aria-label="Select all sources"]')) continue;
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const normalizedTarget = normalizeFileName(fileName);
+    
+    for (let cb of checkboxes) {
+        if (cb.classList.contains('nlm-file-checkbox') || cb.classList.contains('nlm-batch-checkbox')) continue;
+        if (cb.getAttribute('aria-label') === 'Select all sources') continue;
         
-        const rowFileName = extractFileNameFromRow(row);
-        if (rowFileName === fileName) {
-            const cb = row.querySelector('input[type="checkbox"]');
-            // Strict check to ensure we are looking at the native checkbox
-            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox')) {
+        const rowFileName = extractFileNameFromCheckboxContext(cb);
+        if (rowFileName) {
+            const normalizedRowName = normalizeFileName(rowFileName);
+            const isMatch = normalizedRowName === normalizedTarget || 
+                           (normalizedRowName.includes(normalizedTarget) && Math.abs(normalizedRowName.length - normalizedTarget.length) < 5) ||
+                           (normalizedTarget.includes(normalizedRowName) && Math.abs(normalizedTarget.length - normalizedRowName.length) < 5);
+
+            if (isMatch) {
                 const selected = isChecked(cb);
-                DOMService.log(`isNativeSelected: Found row for "${fileName}". Checked: ${selected}`);
+                DOMService.log(`isNativeSelected: Found checkbox for "${rowFileName}" (matched "${fileName}"). Checked: ${selected}`);
                 return selected;
             }
         }
     }
-    DOMService.log(`isNativeSelected: Row not found for "${fileName}"`);
+    DOMService.log(`isNativeSelected: Checkbox not found for "${fileName}"`);
     return false;
 }
 
@@ -442,6 +589,9 @@ function isChecked(checkbox) {
     if (checkbox.getAttribute('aria-checked') === 'true') return true;
     if (checkbox.classList.contains('mdc-checkbox--selected')) return true;
     if (checkbox.classList.contains('mat-mdc-checkbox-checked')) return true;
+    
+    // Catch animation state (transient checked state)
+    if (checkbox.classList.contains('mdc-checkbox--anim-unchecked-checked')) return true;
 
     // Check parent mat-checkbox (Critical for NotebookLM)
     const matCheckbox = checkbox.closest('mat-checkbox');
@@ -455,8 +605,15 @@ function isChecked(checkbox) {
 
 // 辅助：安全点击 (兼容框架事件监听)
 function safeClick(element) {
+    // 1. 模拟鼠标点击流程
+    element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    
+    // 2. 原生点击
     element.click();
-    // 某些框架可能监听 input 事件或 change 事件
+    
+    // 3. 强制分发 Angular/React 依赖的事件
+    // 注意：某些框架监听的是 input 的 change，有些是 click
     element.dispatchEvent(new Event('change', { bubbles: true }));
     element.dispatchEvent(new Event('input', { bubbles: true }));
 }
@@ -498,24 +655,32 @@ function safeClick(element) {
       selectAllCb.addEventListener('change', (e) => {
           const isChecked = e.target.checked;
           const checkboxes = view.querySelectorAll('.nlm-file-checkbox');
-          checkboxes.forEach(cb => cb.checked = isChecked);
-          
-          // 同步到原生列表 (全量同步)
-          syncNativeSelectionFromView(view);
+          checkboxes.forEach(cb => {
+              cb.checked = isChecked;
+              // 全选时也触发单点同步，虽然效率低点但稳
+              syncSingleFileToNative(cb.dataset.file, isChecked);
+          });
       });
   }
   
-  // 绑定单个文件 Checkbox 变化
-  view.addEventListener('change', (e) => {
-      if (e.target.classList.contains('nlm-file-checkbox')) {
+  // 直接绑定单个文件 Checkbox 事件 (不再使用委托)
+  const fileCheckboxes = view.querySelectorAll('.nlm-file-checkbox');
+  fileCheckboxes.forEach(cb => {
+      // 使用 click 事件以获得更即时的响应
+      cb.addEventListener('click', (e) => {
+          // e.target.checked 在 click 事件中已经是点击后的状态
+          const fileName = e.target.dataset.file;
+          const isChecked = e.target.checked;
+          
+          DOMService.log(`[View Action] User clicked "${fileName}" to ${isChecked}`);
+          
           // 更新全选框状态
-          const all = view.querySelectorAll('.nlm-file-checkbox');
-          const allChecked = Array.from(all).every(cb => cb.checked);
+          const allChecked = Array.from(fileCheckboxes).every(c => c.checked);
           if (selectAllCb) selectAllCb.checked = allChecked;
-
-          // 同步到原生列表 (全量同步)
-          syncNativeSelectionFromView(view);
-      }
+          
+          // 立即同步到原生
+          syncSingleFileToNative(fileName, isChecked);
+      });
   });
 
   document.getElementById('nlm-batch-remove')?.addEventListener('click', () => {
@@ -530,6 +695,86 @@ function safeClick(element) {
       renderFileTags(); // 更新主列表标签
     }
   });
+  
+  // 初始化同步：打开视图时，立即从原生状态同步一次
+  // 使用 setTimeout 确保 DOM 渲染完成
+  setTimeout(() => {
+      syncViewFromNative();
+  }, 0);
+}
+
+// 辅助：标准化文件名用于比较 (去除不可见字符、空格标准化)
+function normalizeFileName(name) {
+    if (!name) return '';
+    return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+// 辅助：从 Checkbox 上下文提取文件名 (新策略)
+function extractFileNameFromCheckboxContext(checkbox) {
+    // 1. Try aria-label directly on checkbox (Most reliable for single files)
+    const ariaLabel = checkbox.getAttribute('aria-label');
+    if (ariaLabel && DOMService.isValidFileName(ariaLabel)) {
+        // Handle "Select [Filename]" format if present, though NotebookLM seems to put filename directly
+        if (ariaLabel.startsWith("Select ")) {
+            return ariaLabel.substring(7).trim();
+        }
+        return ariaLabel;
+    }
+
+    // 2. Try traversing up to find a row and use standard extraction
+    const row = checkbox.closest('.row') || checkbox.closest('div[role="row"]');
+    if (row) {
+        const name = extractFileNameFromRow(row);
+        if (name) return name;
+    }
+    
+    return null;
+}
+
+// 新：点对点同步单个文件 (View -> Native)
+function syncSingleFileToNative(fileName, targetState) {
+    // Iterate ALL checkboxes directly, bypassing row selectors which might fail
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const normalizedTarget = normalizeFileName(fileName);
+    let found = false;
+    let visibleFiles = []; // For debug logging
+
+    checkboxes.forEach(cb => {
+        // Skip our own checkboxes
+        if (cb.classList.contains('nlm-file-checkbox') || cb.classList.contains('nlm-batch-checkbox')) return;
+        
+        // Skip "Select all" checkbox
+        if (cb.getAttribute('aria-label') === 'Select all sources') return;
+
+        const rowFileName = extractFileNameFromCheckboxContext(cb);
+        
+        if (rowFileName) {
+            visibleFiles.push(rowFileName);
+            const normalizedRowName = normalizeFileName(rowFileName);
+            
+            // 增强匹配：精确匹配 OR 包含匹配 (处理截断)
+            const isMatch = normalizedRowName === normalizedTarget || 
+                           (normalizedRowName.includes(normalizedTarget) && Math.abs(normalizedRowName.length - normalizedTarget.length) < 5) ||
+                           (normalizedTarget.includes(normalizedRowName) && Math.abs(normalizedTarget.length - normalizedRowName.length) < 5);
+
+            if (isMatch) {
+                const nativeState = isChecked(cb);
+                if (nativeState !== targetState) {
+                    DOMService.log(`[Sync] Clicking native checkbox for "${rowFileName}" (matched "${fileName}") to match View state (${targetState})`);
+                    safeClick(cb);
+                } else {
+                    DOMService.log(`[Sync] Native checkbox for "${rowFileName}" already matches View state (${targetState})`);
+                }
+                found = true;
+                // Don't return here, in case there are duplicates (unlikely but safe)
+            }
+        }
+    });
+    
+    if (!found) {
+        DOMService.log(`[Sync] Warning: Native row not found for "${fileName}".`);
+        DOMService.log(`[Sync] Visible files found via checkboxes:`, visibleFiles);
+    }
 }
 
 function renderFileTags() {
