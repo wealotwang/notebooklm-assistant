@@ -668,12 +668,19 @@ function extractFileNameFromRow(row) {
 
     // 策略2: 查找带有 aria-label 的 checkbox
     // 注意：aria-label 可能会包含 "Select " 前缀，需要小心处理
-    // 但在 NotebookLM 中，通常它就是文件名
     const checkbox = row.querySelector('input[type="checkbox"]');
-    if (checkbox && checkbox.getAttribute('aria-label')) {
-        let label = checkbox.getAttribute('aria-label');
-        if (label === "Select all sources") return null; // 忽略全选框
-        return label;
+    if (checkbox) {
+        const label = checkbox.getAttribute('aria-label');
+        if (label) {
+            if (label === "Select all sources") return null;
+            if (label.startsWith("Select ")) {
+                // 如果是 "Select filename"，提取 filename
+                // 但要小心不要误判
+                const name = label.substring(7).trim();
+                if (name) return name;
+            }
+            return label;
+        }
     }
     
     // 策略3: 查找 span[class*="title"] (备用)
@@ -683,24 +690,65 @@ function extractFileNameFromRow(row) {
     }
 
     // 策略4: 遍历所有子元素，找第一个看起来像文件名的文本
-    // 排除 checkbox, button, icon
+    // 使用 TreeWalker 跳过按钮、图标和无关文本
     const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null, false);
     let node;
+    const candidates = [];
+
+    // 忽略列表 (全小写比对)
+    const ignoreList = new Set([
+        'more_vert', 'check_box_outline_blank', 'check_box', 
+        'edit', 'rename', 'delete', 'remove', 'open_in_new',
+        'source', 'pdf', 'txt', 'audio', 'youtube', 'drive' // 常见类型标识
+    ]);
+
     while(node = walker.nextNode()) {
         const text = node.textContent.trim();
-        if (text.length > 0 && text.length < 100) { // 假设文件名不会太长
-             // 简单的过滤
-             if (['more_vert', 'check_box_outline_blank', 'check_box'].includes(text)) continue;
-             return text;
+        if (!text) continue;
+        
+        // 1. 检查父元素
+        const parent = node.parentElement;
+        if (!parent) continue;
+        
+        // 忽略按钮内的文本
+        if (parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button') continue;
+        if (parent.closest('button')) continue; // 更彻底的检查
+
+        // 忽略图标
+        if (parent.tagName === 'MAT-ICON' || parent.classList.contains('material-icons') || parent.classList.contains('google-material-icons')) continue;
+        
+        // 忽略特定类名
+        if (parent.classList.contains('nlm-file-tag')) continue; // 忽略我们自己加的标签
+        
+        // 2. 检查文本内容
+        if (ignoreList.has(text.toLowerCase())) continue;
+        
+        // 3. 过滤掉单纯的日期 (简单判断：包含数字和逗号，或者是 "x days ago")
+        if (text.match(/\d+ days ago/) || text.match(/\d{4}/)) {
+             // 可能是日期，但也可能是文件名包含数字。
+             // 通常文件名在前，日期在后。我们先收集所有候选者。
         }
+
+        candidates.push(text);
     }
 
-    // 策略4: 回退到 innerText
-    let text = row.innerText.split('\n')[0].trim();
-    if (!text && row.innerText.split('\n')[1]) {
-        text = row.innerText.split('\n')[1].trim();
+    // 从候选者中选择
+    if (candidates.length > 0) {
+        // 通常第一个非日期的就是文件名
+        // 这里简单返回第一个，因为我们已经过滤了按钮和图标
+        return candidates[0];
     }
-    return text;
+
+    // 策略5: 回退到 innerText (最笨的方法)
+    // 尝试按行分割，排除已知无用行
+    const lines = row.innerText.split('\n').map(l => l.trim()).filter(l => l);
+    for (const line of lines) {
+        if (!ignoreList.has(line.toLowerCase()) && !line.includes('days ago')) {
+            return line;
+        }
+    }
+    
+    return null;
 }
 
 function injectMenuItem(menuNode) {
@@ -832,12 +880,12 @@ function makeSourcesDraggable() {
           row.setAttribute('draggable', 'true');
           
           row.addEventListener('dragstart', (e) => {
-             // 优先使用 aria-label
-             let text = checkbox.getAttribute('aria-label');
-             if (!text) {
-                text = row.innerText.split('\n')[0].trim(); 
+             const fileName = extractFileNameFromRow(row);
+             if (fileName) {
+                 e.dataTransfer.setData('text/plain', fileName);
+             } else {
+                 e.preventDefault(); // 如果没找到文件名，禁止拖拽
              }
-             e.dataTransfer.setData('text/plain', text);
           });
       }
   });

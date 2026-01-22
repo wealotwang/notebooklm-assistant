@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.6] - 2026-01-22
+### Fixed
+- **Extraction Logic**: 修复了文件名提取逻辑错误地捕获 "edit" 按钮文本的问题。
+  - 增加了对 "edit", "rename", "delete" 等 UI 操作文本的屏蔽。
+  - 优化了 `TreeWalker` 遍历逻辑，跳过按钮和图标内的文本。
+  - 修复了 `makeSourcesDraggable` 中拖拽时可能使用了旧的提取逻辑的问题。
+
 ## [2.1.5] - 2026-01-22
 ### Fixed
 - **Content Accuracy**: 优化了文件名的提取逻辑，现在优先从 `.source-title` 元素获取标题。
