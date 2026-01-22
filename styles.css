@@ -1,0 +1,222 @@
+/* ...保留之前的样式... */
+/* 文件夹容器 */
+.nlm-folder-container {
+    padding: 8px 16px;
+    border-bottom: 1px solid #dadce0;
+    background-color: #fff;
+    font-family: 'Google Sans', Roboto, Arial, sans-serif;
+    margin-bottom: 8px; /* 与下方隔开一点 */
+  }
+  
+  /* 标题行 */
+  .nlm-folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    color: #5f6368;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  /* 文件夹列表 */
+  .nlm-folder-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* 单个文件夹胶囊样式 */
+  .nlm-folder-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 16px;
+    cursor: pointer;
+    background-color: #fff;
+    transition: all 0.2s ease;
+    color: #3c4043;
+    font-size: 14px;
+    user-select: none;
+  }
+  
+  .nlm-folder-item:hover {
+    background-color: #f1f3f4;
+    border-color: #dadce0;
+  }
+  
+  /* 选中状态 */
+  .nlm-folder-item.active {
+    background-color: #e8f0fe;
+    color: #1967d2;
+    border-color: #e8f0fe;
+  }
+  
+  /* 拖拽悬停状态 */
+  .nlm-folder-item.drag-over {
+    background-color: #e8f0fe;
+    border: 1px dashed #1967d2;
+    transform: scale(1.05);
+  }
+  
+  /* 文件夹图标 */
+  .nlm-icon {
+    margin-right: 6px;
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+  
+  /* 新建按钮 */
+  .nlm-add-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #5f6368;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .nlm-add-btn:hover {
+    color: #1a73e8;
+  }
+  
+  /* 拖拽时的源文件样式 (可选) */
+  .nlm-draggable-source {
+    cursor: grab;
+  }
+  .nlm-draggable-source:active {
+    cursor: grabbing;
+  }
+
+/* --- 上下文菜单相关 --- */
+.nlm-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 16px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-family: Roboto, sans-serif;
+  font-size: 14px;
+  color: #3c4043;
+  cursor: pointer;
+}
+.nlm-menu-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+.nlm-menu-icon {
+  margin-right: 12px;
+  fill: currentColor;
+  width: 24px;
+  height: 24px;
+}
+
+/* --- 选择文件夹弹窗 --- */
+.nlm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.nlm-modal {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  width: 300px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.nlm-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+.nlm-folder-select-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+.nlm-folder-checkbox-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.nlm-folder-checkbox-item input {
+  margin-right: 10px;
+}
+.nlm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.nlm-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid #dadce0;
+  background: white;
+  cursor: pointer;
+  font-weight: 500;
+}
+.nlm-btn-primary {
+  background: #1a73e8;
+  color: white;
+  border: none;
+}
+
+/* --- 文件夹详情视图 --- */
+.nlm-detail-view {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-top: 8px;
+  padding: 16px;
+}
+.nlm-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+.nlm-detail-actions {
+    display: flex;
+    gap: 8px;
+}
+.nlm-file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.nlm-file-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #f1f3f4;
+}
+.nlm-file-item:hover {
+  background-color: #f8f9fa;
+}
+.nlm-file-checkbox {
+  margin-right: 12px;
+}
+.nlm-file-name {
+  flex: 1;
+  font-size: 14px;
+  color: #3c4043;
+}
