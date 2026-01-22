@@ -1,18 +1,24 @@
 # Changelog
 
-## [2.1.10] - 2026-01-22
-### Changed
-- **Refactor**: Introduced `DOMService` pattern to centralize DOM operations and improve maintainability, inspired by Gemini Voyager architecture.
-- **Improvement**: Significantly enhanced filename extraction logic to strictly filter out UI texts like "Edit", "More", "Menu".
-- **Improvement**: Prioritized `.single-source-container` for filename extraction as requested.
-- **Fix**: Resolved issue where "edit" was incorrectly captured as the filename.
+## [2.1.12] - 2026-01-22
+### Fixed
+- **Sync Logic**: 彻底修复了 Checkbox 同步脱节问题。
+  - 重写了 `isChecked` 逻辑，精准识别 Angular Material (`mat-checkbox`) 的复杂状态，解决了反选失效和初始状态不一致的问题。
+  - 增强了同步机制，在打开文件夹时强制全量校对状态。
+- **Log Viewer**: 正式上线弹窗日志查看器（点击插件图标即可使用），无需再打开开发者工具控制台。
+
+## [2.1.11] - 2026-01-22
+### Added
+- **Log Viewer**: Added a popup interface (click extension icon) to view real-time debug logs. This makes troubleshooting filename extraction much easier.
+- **Localization**: Added strict filtering for Chinese UI terms ("编辑", "更多", "取消", etc.) to prevent them from being captured as filenames.
+- **Fix**: Resolved issue where "edit" (and localized variants) were still being captured in fallback scenarios.
 
 ## [2.1.10] - 2026-01-22
 ### Changed
-- **Refactor**: Introduced `DOMService` pattern to centralize DOM operations and improve maintainability, inspired by Gemini Voyager architecture.
-- **Improvement**: Significantly enhanced filename extraction logic to strictly filter out UI texts like "Edit", "More", "Menu".
-- **Improvement**: Prioritized `.source-title` and `.single-source-container` for filename extraction as requested.
-- **Fix**: Resolved issue where "edit" was incorrectly captured as the filename.
+- **Refactor**: Introduced `DOMService` pattern to centralize DOM operations.
+- **Feature**: Added `debug` mode and detailed logging for filename extraction strategies.
+- **Improvement**: Reordered extraction strategy to prioritize `.single-source-container` > `aria-description` > `.source-title`.
+- **Fix**: Enhanced strict filtering to prevent "Edit", "More", "Menu" from being captured as filenames.
 
 ## [2.1.9] - 2026-01-22
 ### Fixed

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM Folder Manager",
-  "version": "2.1.10",
+  "version": "2.1.12",
   "description": "Add folder organization to NotebookLM sources.",
   "permissions": ["storage"],
   "content_scripts": [
@@ -12,6 +12,7 @@
     }
   ],
   "action": {
-    "default_title": "NotebookLM Folders"
+    "default_title": "NotebookLM Folders",
+    "default_popup": "popup.html"
   }
 }

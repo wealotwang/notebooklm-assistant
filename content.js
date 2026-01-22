@@ -1,4 +1,4 @@
-console.log("NotebookLM Folder Manager: Loaded v2.0 (Menu & Detail View)");
+console.log("NotebookLM Folder Manager: Loaded v2.1.12 (Sync Fixes & Log Viewer)");
 
 // --- 全局状态 ---
 let state = {
@@ -424,17 +424,33 @@ function isNativeSelected(fileName) {
         const rowFileName = extractFileNameFromRow(row);
         if (rowFileName === fileName) {
             const cb = row.querySelector('input[type="checkbox"]');
-            return cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox') && isChecked(cb);
+            // Strict check to ensure we are looking at the native checkbox
+            if (cb && !cb.classList.contains('nlm-batch-checkbox') && !cb.classList.contains('nlm-file-checkbox')) {
+                const selected = isChecked(cb);
+                DOMService.log(`isNativeSelected: Found row for "${fileName}". Checked: ${selected}`);
+                return selected;
+            }
         }
     }
+    DOMService.log(`isNativeSelected: Row not found for "${fileName}"`);
     return false;
 }
 
 // 辅助：检查 Checkbox 是否选中 (兼容 Angular Material/MDC)
 function isChecked(checkbox) {
-    return checkbox.checked || 
-           checkbox.classList.contains('mdc-checkbox--selected') || 
-           checkbox.getAttribute('aria-checked') === 'true';
+    if (checkbox.checked) return true;
+    if (checkbox.getAttribute('aria-checked') === 'true') return true;
+    if (checkbox.classList.contains('mdc-checkbox--selected')) return true;
+    if (checkbox.classList.contains('mat-mdc-checkbox-checked')) return true;
+
+    // Check parent mat-checkbox (Critical for NotebookLM)
+    const matCheckbox = checkbox.closest('mat-checkbox');
+    if (matCheckbox) {
+        if (matCheckbox.classList.contains('mat-mdc-checkbox-checked')) return true;
+        if (matCheckbox.classList.contains('mdc-checkbox--selected')) return true;
+    }
+    
+    return false;
 }
 
 // 辅助：安全点击 (兼容框架事件监听)
@@ -588,6 +604,24 @@ function showNativeList() {
 // --- Services ---
 
 const DOMService = {
+  debug: true, // Enable debug logging
+  logBuffer: [], // Store logs for popup display
+
+  log(message, data = null) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${message} ${data ? JSON.stringify(data) : ''}`;
+    
+    // Console output
+    if (this.debug) {
+      if (data) console.log(`[NotebookLM-DOM] ${message}`, data);
+      else console.log(`[NotebookLM-DOM] ${message}`);
+    }
+
+    // Buffer for Popup
+    this.logBuffer.unshift(logEntry);
+    if (this.logBuffer.length > 50) this.logBuffer.pop();
+  },
+
   /**
    * Checks if a text is a valid filename and not a UI control label.
    * Performs strict filtering to avoid capturing "Edit", "More", etc.
@@ -602,54 +636,78 @@ const DOMService = {
       'edit', 'more', 'menu', 'delete', 'rename', 'source', 
       'edit source', 'remove', 'more_vert', 'open_in_new',
       'check_box_outline_blank', 'check_box', 'add source',
-      'select all sources'
+      'select all sources', 'file_upload', 'drive_folder_upload',
+      'edit_note', 'edit_square', 'drive_file_rename_outline', 'mode_edit',
+      '编辑', '更多', '删除', '重命名', '取消', '全选', '新建',
+      'rename source', 'edit source'
     ];
     
     if (invalidTerms.includes(lower)) {
-        // console.log("[DOMService] Rejected invalid term:", t);
+        this.log(`Rejected invalid term: "${t}"`);
         return false;
     }
     
-    if (lower.startsWith('edit ')) return false; // "Edit source", "Edit file"
-    if (lower.match(/^\d+ days ago$/)) return false; // Date only
+    if (lower.startsWith('edit ')) return false; 
+    if (lower.match(/^\d+ days ago$/)) return false; 
     
     return true;
   },
 
   /**
    * Extracts filename from a row element with prioritized strategies.
-   * STRICTLY prioritizes .source-title as requested by user.
+   * STRICTLY prioritizes .single-source-container as requested.
    */
   extractFileName(row) {
     if (!row) return null;
 
-    // Strategy 1: Direct .source-title (Highest Priority)
-    // The user confirmed: "一个 data 的名字数据都是在这里的" (The name data is right here)
-    const titleSpan = row.querySelector('.source-title');
-    if (titleSpan && this.isValidFileName(titleSpan.textContent)) {
-        console.log("[DOMService] Extracted from .source-title:", titleSpan.textContent.trim());
-        return titleSpan.textContent.trim();
-    }
+    this.log("Attempting extraction for row:", row);
 
-    // Strategy 2: .single-source-container .source-title
-    // If 'row' is a wrapper that contains the container
-    const singleSourceContainer = row.querySelector('.single-source-container');
-    if (singleSourceContainer) {
-        const title = singleSourceContainer.querySelector('.source-title');
-        if (title && this.isValidFileName(title.textContent)) {
-            console.log("[DOMService] Extracted from .single-source-container:", title.textContent.trim());
-            return title.textContent.trim();
+    // Strategy 0: [cdk-describedby-host] (Highest Priority per User Finding)
+    // User identified this attribute specifically marks the title element.
+    const hostElement = row.querySelector('[cdk-describedby-host]');
+    if (hostElement) {
+        const text = hostElement.textContent.trim();
+        if (this.isValidFileName(text)) {
+            this.log("Success (Strategy 0 - [cdk-describedby-host]):", text);
+            return text;
         }
     }
 
-    // Strategy 3: aria-description on "More" button
-    // This is often a reliable fallback if visual extraction fails
+    // Strategy 1: .single-source-container (Highest Priority per User Request)
+    // The user explicitly pointed out this container holds the correct data.
+    const singleSourceContainer = row.querySelector('.single-source-container');
+    if (singleSourceContainer) {
+        const title = singleSourceContainer.querySelector('.source-title');
+        if (title) {
+             const text = title.textContent.trim();
+             if (this.isValidFileName(text)) {
+                this.log("Success (Strategy 1 - .single-source-container):", text);
+                return text;
+             } else {
+                this.log("Found .single-source-container title but invalid:", text);
+             }
+        }
+    }
+
+    // Strategy 2: aria-description on "More" button (Metadata)
+    // Often contains the full filename even if truncated visually
     const moreBtn = row.querySelector('button[aria-description]');
     if (moreBtn) {
         const desc = moreBtn.getAttribute('aria-description');
         if (this.isValidFileName(desc)) {
-             console.log("[DOMService] Extracted from button aria-description:", desc.trim());
+             this.log("Success (Strategy 2 - aria-description):", desc.trim());
              return desc.trim();
+        }
+    }
+
+    // Strategy 3: Direct .source-title in row
+    // Fallback if container structure is different
+    const titleSpan = row.querySelector('.source-title');
+    if (titleSpan) {
+        const text = titleSpan.textContent.trim();
+        if (this.isValidFileName(text)) {
+            this.log("Success (Strategy 3 - direct .source-title):", text);
+            return text;
         }
     }
 
@@ -658,15 +716,21 @@ const DOMService = {
     if (checkbox) {
         const label = checkbox.getAttribute('aria-label');
         if (label) {
-            if (label === "Select all sources") return null;
+            let name = null;
             if (label.startsWith("Select ")) {
-                const name = label.substring(7).trim();
-                if (this.isValidFileName(name)) return name;
+                name = label.substring(7).trim();
+            } else if (label !== "Select all sources") {
+                name = label;
             }
-            if (this.isValidFileName(label)) return label;
+            
+            if (name && this.isValidFileName(name)) {
+                this.log("Success (Strategy 4 - checkbox label):", name);
+                return name;
+            }
         }
     }
 
+    this.log("Failed to extract filename from row.");
     return null;
   },
 
@@ -681,9 +745,26 @@ const DOMService = {
         
         let sibling = current.previousElementSibling;
         while (sibling) {
-            if (sibling.innerText && this.isValidFileName(sibling.innerText)) {
-                // Ensure we don't pick up "Edit" or "More" that might be in a sibling span
-                return sibling.innerText.split('\n')[0].trim();
+            // Skip icons and non-text elements
+            if (sibling.classList.contains('material-icons') || 
+                sibling.classList.contains('google-symbols') || 
+                sibling.getAttribute('role') === 'img' ||
+                sibling.tagName === 'SVG') {
+                sibling = sibling.previousElementSibling;
+                continue;
+            }
+
+            const text = sibling.innerText;
+            if (text) {
+                // Check each line as a potential candidate
+                const lines = text.split('\n');
+                for (const line of lines) {
+                    const candidate = line.trim();
+                    if (candidate && this.isValidFileName(candidate)) {
+                        this.log("Guessed from sibling:", candidate);
+                        return candidate;
+                    }
+                }
             }
             sibling = sibling.previousElementSibling;
         }
@@ -696,53 +777,65 @@ const DOMService = {
 // --- Menu Injection Logic ---
 function setupGlobalClickListener() {
   document.addEventListener('mousedown', (e) => {
+    // Check if we are clicking inside a menu
+    // If we are clicking inside a menu, we should NOT try to extract a filename,
+    // because the filename is context-dependent on what opened the menu.
+    // We want to PRESERVE the state.currentMenuFile that was set when the menu opener was clicked.
+    if (e.target.closest('.mat-mdc-menu-content') || e.target.closest('.nlm-menu-item')) {
+        DOMService.log("GlobalListener: Ignoring click inside menu to preserve context.");
+        return;
+    }
+
     const btn = e.target.closest('button');
     
     // 1. Direct aria-description check (Fastest & Most Accurate)
     if (btn) {
         state.lastClickedButton = btn;
         const description = btn.getAttribute('aria-description');
+        // DOMService.log("Global Click: Button clicked with description:", description);
+        
         if (DOMService.isValidFileName(description)) {
              state.currentMenuFile = description.trim();
-             console.log("[GlobalListener] Captured from aria-description:", state.currentMenuFile);
+             DOMService.log("GlobalListener: Captured from aria-description:", state.currentMenuFile);
              return;
+        } else {
+             // DOMService.log("GlobalListener: Ignored invalid description:", description);
         }
     }
 
-    // 2. Container Traversal
-    // Look for .source-title explicitly in the ancestry
-    let target = e.target;
-    let container = null;
-    
-    for (let i = 0; i < 6; i++) {
-        if (!target || target === document.body) break;
-        
-        // If we hit a container that looks like a source row
-        if (target.classList.contains('single-source-container') || 
-            target.classList.contains('row') || 
-            target.getAttribute('role') === 'row' ||
-            (target.tagName === 'DIV' && target.querySelector('.source-title'))) {
-            container = target;
-            break;
-        }
-        target = target.parentElement;
-    }
-
-    if (container) {
-       const fileName = DOMService.extractFileName(container);
+    // 2. Container Traversal (Robust using closest)
+    // Try to find the row container which holds the title
+    const row = e.target.closest('.row') || e.target.closest('div[role="row"]');
+    if (row) {
+       DOMService.log("GlobalListener: Found row container", row);
+       const fileName = DOMService.extractFileName(row);
        if (fileName) {
            state.currentMenuFile = fileName;
-           console.log("[GlobalListener] Captured from container:", fileName);
+           DOMService.log("GlobalListener: Captured from row:", fileName);
            return;
        }
-    } 
+    }
     
+    // Fallback: Check for .single-source-container directly if not in a standard row
+    const sourceContainer = e.target.closest('.single-source-container');
+    if (sourceContainer) {
+       const title = sourceContainer.querySelector('.source-title');
+       if (title) {
+           const text = title.textContent.trim();
+           if (DOMService.isValidFileName(text)) {
+               state.currentMenuFile = text;
+               DOMService.log("GlobalListener: Captured from .single-source-container directly:", text);
+               return;
+           }
+       }
+    }
+
     // 3. Fallback: Sibling Guessing
     if (btn) {
         const fileName = DOMService.guessFileNameFromSiblings(btn);
         if (fileName) {
             state.currentMenuFile = fileName;
-            console.log("[GlobalListener] Guessed from siblings:", fileName);
+            DOMService.log("GlobalListener: Guessed from siblings:", fileName);
         }
     }
   }, true);
@@ -902,5 +995,12 @@ function addFileToFolder(fileName, folderId) {
     console.log(`Added "${fileName}" to folder "${folderId}"`);
   }
 }
+
+// --- Message Listener for Popup ---
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getLogs") {
+    sendResponse({ logs: DOMService.logBuffer });
+  }
+});
 
 init();
