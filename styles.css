@@ -6,6 +6,7 @@
     background-color: #fff;
     font-family: 'Google Sans', Roboto, Arial, sans-serif;
     margin-bottom: 8px; /* 与下方隔开一点 */
+    position: relative; /* 为定位做准备 */
   }
   
   /* 标题行 */
@@ -21,6 +22,11 @@
     letter-spacing: 0.5px;
   }
   
+  .nlm-header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
   /* 文件夹列表 */
   .nlm-folder-list {
     display: flex;
@@ -73,20 +79,86 @@
     fill: currentColor;
   }
   
-  /* 新建按钮 */
+  /* 新建按钮 & 批量按钮 */
   .nlm-add-btn {
     background: none;
     border: none;
     cursor: pointer;
     font-size: 18px;
     color: #5f6368;
-    padding: 0 4px;
+    padding: 4px;
     line-height: 1;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .nlm-add-btn:hover {
     color: #1a73e8;
+    background-color: rgba(26, 115, 232, 0.1);
   }
   
+  /* 批量选择 Checkbox */
+  .nlm-batch-checkbox {
+    margin-right: 12px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #1a73e8;
+    z-index: 100; /* 确保在最上层 */
+  }
+
+  /* 批量操作工具栏 */
+  .nlm-batch-toolbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 9999;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .nlm-batch-toolbar.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nlm-batch-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  
+  .nlm-batch-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+  }
+
+  .nlm-batch-btn.primary {
+    background-color: #8ab4f8;
+    color: #202124;
+    border: none;
+    font-weight: 500;
+  }
+  
+  .nlm-batch-btn.primary:hover {
+    background-color: #aecbfa;
+  }
+
   /* 拖拽时的源文件样式 (可选) */
   .nlm-draggable-source {
     cursor: grab;

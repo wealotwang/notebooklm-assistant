@@ -14,9 +14,10 @@
 
 ### Phase 2: Refinement & Stability (🚧 In Progress)
 - [x] **Feature**: Inject "Move to Folder" menu item into native context menu.
+- [x] **Bug Fix**: Ensure reliable file name extraction (Fixed in v2.0.3).
+- [x] **Task**: Analyze Gemini Voyager architecture for reference (`docs/planning/gemini_voyager_analysis.md`).
 - [ ] **Feature**: Batch operations (Select multiple -> Move).
 - [ ] **Feature**: Folder Detail View (List view for batch management).
-- [ ] **Bug Fix**: Ensure reliable file name extraction.
 
 ### Phase 3: Advanced Features (📅 Planned)
 - [ ] Sync storage.
