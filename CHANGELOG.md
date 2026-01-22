@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3] - 2026-01-22
+### Fixed
+- 重构文件名捕获逻辑，移除对 `.row` 类名的强依赖。
+- 新增 `guessFileNameFromSiblings` 算法，从按钮的前序兄弟节点中智能提取文件名。
+- 在 `mousedown` 阶段自动记录最后一次点击的按钮，作为 Fallback 恢复点。
+- 增强了 `extractFileNameFromRow` 的鲁棒性，使用 `TreeWalker` 遍历文本节点，不再仅依赖 innerText。
+
 ## [2.0.2] - 2026-01-22
 ### Fixed
 - 紧急修复文件名获取失败问题。

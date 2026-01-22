@@ -250,32 +250,109 @@ function showNativeList() {
 
 // --- 菜单注入逻辑 ---
 function setupGlobalClickListener() {
-  document.addEventListener('click', (e) => {
-    // 1. 监听"三个点"按钮点击 (More options)
-    // 尝试找到触发菜单的按钮，通常有 aria-label="More options" 或类似
-    const moreBtn = e.target.closest('button'); 
-    
-    if (moreBtn) {
-       // 尝试找到所在的行
-       const row = moreBtn.closest('.row') || moreBtn.closest('div[role="row"]');
-       if (row) {
-           // 尝试获取文件名
-           // 策略1: 直接从 innerText 获取第一行
-           let fileName = row.innerText.split('\n')[0].trim();
-           
-           // 策略2: 如果有 aria-label 的 checkbox
-           const checkbox = row.querySelector('input[type="checkbox"]');
-           if (checkbox && checkbox.getAttribute('aria-label')) {
-               fileName = checkbox.getAttribute('aria-label');
-           }
+  // 使用 mousedown 而不是 click，以确保在事件被 Angular 阻止前捕获
+  document.addEventListener('mousedown', (e) => {
+    // 1. 记录最后点击的按钮 (用于 fallback)
+    const btn = e.target.closest('button');
+    if (btn) {
+        state.lastClickedButton = btn;
+        console.log("NotebookLM Extension: Button clicked", btn);
+    }
 
-           if (fileName) {
-               state.currentMenuFile = fileName;
-               console.log("NotebookLM Extension: Detected click on file:", state.currentMenuFile);
-           }
+    // 2. 尝试从点击位置向上查找可能的容器
+    let target = e.target;
+    let container = null;
+    
+    // 向上查找 5 层，寻找包含文本的块级元素
+    for (let i = 0; i < 5; i++) {
+        if (!target || target === document.body) break;
+        
+        // 如果遇到明确的 row 标识
+        if (target.classList.contains('row') || target.getAttribute('role') === 'row') {
+            container = target;
+            break;
+        }
+        // 或者只要包含 checkbox 的 div 也可以认为是容器
+        if (target.querySelector('input[type="checkbox"]')) {
+            container = target;
+            break;
+        }
+        target = target.parentElement;
+    }
+
+    if (container) {
+       // 尝试提取文件名并缓存
+       const fileName = extractFileNameFromRow(container);
+       if (fileName) {
+           state.currentMenuFile = fileName;
+           console.log("NotebookLM Extension: Captured interaction with file:", fileName);
        }
+    } else if (btn) {
+        // 如果没找到容器，但点的是按钮，尝试从按钮的兄弟节点找
+        // 通常文件名在按钮的左侧（前面的兄弟节点）
+        const fileName = guessFileNameFromSiblings(btn);
+        if (fileName) {
+            state.currentMenuFile = fileName;
+            console.log("NotebookLM Extension: Guessed filename from siblings:", fileName);
+        }
     }
   }, true); // Capture phase
+}
+
+function guessFileNameFromSiblings(element) {
+    let current = element;
+    // 向上找几层，每一层都看看前面有没有兄弟节点包含文本
+    for (let i = 0; i < 3; i++) {
+        if (!current || current === document.body) break;
+        
+        let sibling = current.previousElementSibling;
+        while (sibling) {
+            if (sibling.innerText && sibling.innerText.trim().length > 0) {
+                // 排除一些显然不是文件名的词
+                const text = sibling.innerText.trim();
+                if (text !== "more_vert" && text !== "Source" && !text.includes("ago")) {
+                    return text.split('\n')[0].trim();
+                }
+            }
+            sibling = sibling.previousElementSibling;
+        }
+        current = current.parentElement;
+    }
+    return null;
+}
+
+function extractFileNameFromRow(row) {
+    // 策略1: 优先查找带有 aria-label 的 checkbox (最准确)
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (checkbox && checkbox.getAttribute('aria-label')) {
+        return checkbox.getAttribute('aria-label');
+    }
+    
+    // 策略2: 查找特定的 title class
+    const titleSpan = row.querySelector('.source-title') || row.querySelector('span[class*="title"]');
+    if (titleSpan) {
+        return titleSpan.innerText.trim();
+    }
+
+    // 策略3: 遍历所有子元素，找第一个看起来像文件名的文本
+    // 排除 checkbox, button, icon
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while(node = walker.nextNode()) {
+        const text = node.textContent.trim();
+        if (text.length > 0 && text.length < 100) { // 假设文件名不会太长
+             // 简单的过滤
+             if (['more_vert', 'check_box_outline_blank', 'check_box'].includes(text)) continue;
+             return text;
+        }
+    }
+
+    // 策略4: 回退到 innerText
+    let text = row.innerText.split('\n')[0].trim();
+    if (!text && row.innerText.split('\n')[1]) {
+        text = row.innerText.split('\n')[1].trim();
+    }
+    return text;
 }
 
 function injectMenuItem(menuNode) {
