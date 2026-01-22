@@ -609,6 +609,13 @@ function setupGlobalClickListener() {
             container = target;
             break;
         }
+        
+        // 关键点：支持用户反馈的 single-source-container
+        if (target.classList.contains('single-source-container')) {
+            container = target;
+            break;
+        }
+
         // 或者只要包含 checkbox 的 div 也可以认为是容器
         if (target.querySelector('input[type="checkbox"]')) {
             container = target;
@@ -647,7 +654,15 @@ function guessFileNameFromSiblings(element) {
             if (sibling.innerText && sibling.innerText.trim().length > 0) {
                 // 排除一些显然不是文件名的词
                 const text = sibling.innerText.trim();
-                if (text !== "more_vert" && text !== "Source" && !text.includes("ago")) {
+                const lowerText = text.toLowerCase();
+                
+                // 增加过滤词 "edit" 等
+                if (lowerText !== "more_vert" && 
+                    lowerText !== "source" && 
+                    lowerText !== "edit" && 
+                    lowerText !== "rename" && 
+                    lowerText !== "delete" &&
+                    !lowerText.includes("ago")) {
                     return text.split('\n')[0].trim();
                 }
             }

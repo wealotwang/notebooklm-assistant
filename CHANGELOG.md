@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.8] - 2026-01-22
+### Fixed
+- **Interaction Accuracy**: 修复了“移动到文件夹”菜单操作时无法获取正确文件名的问题。
+  - 在 `setupGlobalClickListener` 中明确支持了 `.single-source-container` 容器识别，确保点击菜单按钮时能正确定位到包含文件名的父容器。
+  - 增强了 `guessFileNameFromSiblings` 回退策略，增加了对 "edit", "rename", "delete" 等关键字的过滤，防止在无法定位容器时误抓取操作按钮文本。
+
 ## [2.1.7] - 2026-01-22
 ### Fixed
 - **Content Accuracy**: 进一步增强文件名提取逻辑，深度适配用户提供的 DOM 结构。
