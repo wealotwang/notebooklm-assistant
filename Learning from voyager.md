@@ -1,73 +1,87 @@
 
-## 2026-01-24: Timeline Implementation Journey & Review
-**Session Goal:** Implement a Voyager-style "Timeline Scrollbar" for NotebookLM to facilitate quick navigation of user queries.
+## 2026-01-24: 时间轴功能实现复盘
+**本次目标:** 为 NotebookLM 实现一个类似 Voyager 风格的“时间轴滚动条”，以便用户快速导航到历史提问位置。
 
-### 1. Evolution of Architecture
-*   **Initial Approach (v2.1.18):**
-    *   Injected `.nlm-timeline-bar` directly into `document.body` with `position: fixed`.
-    *   *Issue:* The timeline was visually detached from the Chat Panel, especially when the right-side Studio panel was toggled.
-*   **Refined Approach (v2.1.19):**
-    *   Moved injection target to the **parent of `.chat-panel-content`**.
-    *   Changed positioning to `position: absolute; right: 10px; height: 100%`.
-    *   Forced `position: relative` on the parent container.
-    *   *Result:* The timeline now perfectly adheres to the Chat Panel's edge, resizing and moving with it naturally.
+### 1. 架构演进
+*   **初步方案 (v2.1.18):**
+    *   直接将 `.nlm-timeline-bar` 注入到 `document.body`，使用 `position: fixed`。
+    *   *问题:* 时间轴与聊天面板视觉分离，特别是当右侧 Studio 面板打开时，位置会错位。
+*   **改进方案 (v2.1.19):**
+    *   将注入目标改为 **`.chat-panel-content` 的父容器**。
+    *   定位改为 `position: absolute; right: 10px; height: 100%`。
+    *   强制父容器设置为 `position: relative`。
+    *   *结果:* 时间轴完美吸附在聊天面板边缘，跟随面板大小变化和移动。
 
-### 2. UI/UX Refinements
-*   **Visual Indicators:**
-    *   Switched from generic "Dots" to **Left-Pointing Triangles** (`.nlm-timeline-dot::after` with CSS borders).
-    *   This provides a stronger semantic cue that the marker relates to the content on the left.
-*   **Tooltip Evolution:**
-    *   **v1:** Simple `title` attribute (native browser tooltip, slow and unstyled).
-    *   **v2:** Custom `.nlm-timeline-tooltip` with fixed 200px width (caused vertical stacking).
-    *   **v3 (Final):** **Adaptive Width Strategy**.
-        *   `width: max-content` + `max-width: 400px`.
-        *   `min-width: 60px`.
-        *   Used `white-space: pre-wrap` for proper text rendering.
-        *   Applied `line-clamp: 3` to limit vertical height while showing sufficient context (~50-60 chars).
+### 2. UI/UX 优化
+*   **视觉指示器:**
+    *   从通用的“圆点”改为 **向左的小三角** (`.nlm-timeline-dot::after` 使用 CSS border 实现)。
+    *   这提供了更强的语义提示，表明该标记指向左侧的内容。
+*   **Tooltip 演进:**
+    *   **v1:** 简单的 `title` 属性 (原生浏览器提示，慢且无样式)。
+    *   **v2:** 自定义 `.nlm-timeline-tooltip`，固定 200px 宽度 (导致文字垂直堆叠)。
+    *   **v3 (最终版):** **自适应宽度策略**。
+        *   `width: max-content` + `max-width: 400px`。
+        *   `min-width: 60px`。
+        *   使用 `white-space: pre-wrap` 保证文本换行正确。
+        *   应用 `line-clamp: 3` 限制垂直高度，同时显示足够的上下文 (约 50-60 字)。
 
-### 3. Robustness & Engineering
-*   **DOM Sentinel:** Implemented a `MutationObserver` on `document.body` to wait for the Chat Panel to exist before initializing, solving "script run too early" issues.
-*   **Reactivity:** The timeline automatically updates when:
-    *   New messages are generated (MutationObserver).
-    *   Window is resized (ResizeObserver).
-    *   User scrolls (Scroll Event).
+### 3. 健壮性与工程化
+*   **DOM 哨兵:** 在 `document.body` 上实现了 `MutationObserver`，等待聊天面板存在后再初始化，解决了“脚本运行过早”的问题。
+*   **响应式:** 时间轴在以下情况自动更新:
+    *   生成新消息 (MutationObserver)。
+    *   窗口大小改变 (ResizeObserver)。
+    *   用户滚动 (Scroll Event)。
 
-### 4. Versioning
-*   **v2.1.18**: MVP Release.
-*   **v2.1.19**: Layout fix (Absolute positioning) & Triangle shapes.
-*   **v2.1.20**: Adaptive Tooltip sizing.
+### 4. 版本记录
+*   **v2.1.18**: MVP 发布。
+*   **v2.1.19**: 布局修复 (绝对定位) & 三角形样式。
+*   **v2.1.20**: 自适应 Tooltip 尺寸。
 
-## 2026-01-24: Folder Isolation & Source Type Compatibility Review
-**Session Goal:** Enhance Folder Manager robustness, support SPA navigation, and fix compatibility with diverse source types (YouTube, PDF).
+## 2026-01-24: 文件夹隔离与多类型 Source 兼容性复盘
+**本次目标:** 增强文件夹管理器的健壮性，支持 SPA 导航，并修复对多种 Source 类型 (YouTube, PDF) 的兼容性。
 
-### 1. Data Isolation Strategy (v2.1.21)
-*   **Problem:** Folder data was global. Folders created in "Notebook A" appeared in "Notebook B", leading to confusion and data pollution.
-*   **Technical Challenge:** NotebookLM is a Single Page Application (SPA). Switching notebooks changes the URL but doesn't refresh the page, so the extension script doesn't automatically restart.
-*   **Solution:**
-    *   **Context Awareness:** Implemented `getNotebookId()` to parse the URL.
-    *   **Namespacing:** Changed storage keys from `nlm_folders` to `nlm_folders_${notebookId}`.
-    *   **SPA Listener:** Added a global `MutationObserver` on `document` to watch for URL changes, triggering a full data reload and UI reset when context changes.
+### 1. 数据隔离策略 (v2.1.21)
+*   **问题:** 文件夹数据是全局的。在 "Notebook A" 创建的文件夹会出现在 "Notebook B" 中，导致混淆和数据污染。
+*   **技术挑战:** NotebookLM 是单页应用 (SPA)。切换笔记本只改变 URL，不刷新页面，扩展脚本不会自动重启。
+*   **解决方案:**
+    *   **上下文感知:** 实现 `getNotebookId()` 解析 URL。
+    *   **命名空间:** 将存储 Key 从 `nlm_folders` 升级为 `nlm_folders_${notebookId}`。
+    *   **SPA 监听器:** 在 `document` 上添加全局 `MutationObserver` 监听 URL 变化，在上下文改变时触发全量数据重载和 UI 重置。
 
-### 2. UX Optimization: Deletion (v2.1.22)
-*   **Problem:** Deleting folders required right-clicking, which was hidden and unintuitive.
-*   **Solution:**
-    *   Added an explicit **"×" button** on the active folder chip.
-    *   **Event Handling:** Used `e.stopPropagation()` strictly to ensure clicking "Delete" didn't mistakenly trigger "Select Folder".
-    *   **Safety:** Added `confirm()` dialogs to prevent accidental deletion.
+### 2. UX 优化: 删除功能 (v2.1.22)
+*   **问题:** 删除文件夹需要右键点击，操作隐藏且不直观。
+*   **解决方案:**
+    *   在当前激活的文件夹 Chip 上增加显式的 **"×" 按钮**。
+    *   **事件处理:** 严格使用 `e.stopPropagation()`，防止点击“删除”误触发“选择文件夹”。
+    *   **安全:** 增加 `confirm()` 确认框防止误删。
 
-### 3. "The Invisible Update" Bug (v2.1.23)
-*   **Problem:** Users reported that after moving a file to a folder via the menu, nothing happened.
-*   **Analysis:** The data *was* saved, but the UI (the blue tags next to files) wasn't repainting.
-*   **Fix:**
-    *   Traced the `showFolderSelectionModal` save handler.
-    *   Explicitly added calls to `renderFileTags()` and `renderFolders()` immediately after data save.
-    *   Result: "Instant gratification" UI updates.
+### 3. "隐形更新" Bug 修复 (v2.1.23)
+*   **问题:** 用户反馈通过菜单移动文件到文件夹后，界面没反应。
+*   **分析:** 数据*已经*保存了，但 UI (文件旁的蓝色标签) 没有重绘。
+*   **修复:**
+    *   追踪 `showFolderSelectionModal` 的保存处理函数。
+    *   在数据保存后显式调用 `renderFileTags()` 和 `renderFolders()`。
+    *   结果: 实现了“即时反馈”的 UI 更新。
 
-### 4. Universal Source Support (v2.1.24)
-*   **Problem:** YouTube links, PDFs, and Audio files were **ignored** by the Batch Manager and Folder Tags.
-*   **Root Cause:** The extension relied on looking for `.row` elements. NotebookLM renders these special sources as standalone `.single-source-container` elements *without* a wrapper row.
-*   **Solution:**
-    *   **New Abstraction:** Created `getAllSourceRows()` helper function.
-    *   **Logic:** It queries for both standard rows AND standalone containers, merging them into a unified list.
-    *   **Adaptation:** Updated filename extraction logic to handle the internal structure of these standalone containers (which differs from standard rows).
-    *   **Impact:** YouTube/PDF sources now fully support Batch Select, Drag-and-Drop, and Visual Tags.
+### 4. 全能 Source 支持 (v2.1.24)
+*   **问题:** YouTube 链接、PDF 和音频文件被批量管理器和文件夹标签 **忽略** 了。
+*   **根本原因:** 扩展之前依赖查找 `.row` 元素。NotebookLM 将这些特殊 Source 渲染为独立的 `.single-source-container` 元素，*没有*包裹在常规行中。
+*   **解决方案:**
+    *   **新抽象层:** 创建 `getAllSourceRows()` 辅助函数。
+    *   **逻辑:** 同时查询标准行 AND 独立容器，合并为一个统一列表。
+    *   **适配:** 更新文件名提取逻辑，处理这些独立容器内部不同的结构。
+    *   **影响:** YouTube/PDF Source 现在完全支持批量选择、拖拽和可视化标签。
+
+## 2026-01-24: 批量模式体验革新 (Focus Mode)
+**本次目标:** 解决批量操作时“两列 Checkbox”造成的混淆，提升操作效率。
+
+### 1. 专注模式 (Focus Mode) (v2.1.25)
+*   **问题:** NotebookLM 原生自带一列 Checkbox，插件又增加了一列。用户不知道该点哪个，界面杂乱。
+*   **解决方案:**
+    *   **视觉屏蔽:** 进入批量模式时，给 `body` 添加 `.nlm-batch-mode-active`。CSS 选择器强制原生 Checkbox 透明度为 0.1 并禁止点击。
+    *   **行高亮:** 选中文件时，整行显示浅蓝色背景，视觉反馈极其明显。
+    *   **全域点击:** 拦截行的点击事件。现在点击行的任何位置（不仅是小框框）都能切换选中状态，并阻止原生的“打开文件”跳转。
+
+### 2. 细节打磨 (v2.1.26)
+*   **样式统一:** 强制 Checkbox 尺寸为 18px，锁定 `flex-shrink: 0`，防止在复杂布局（如长标题）中变形。
+*   **移除干扰:** 移除了操作成功后的 `alert()` 弹窗，改为无打扰的 Console Log 和即时的视觉变化。
