@@ -36,3 +36,38 @@
 *   **v2.1.18**: MVP Release.
 *   **v2.1.19**: Layout fix (Absolute positioning) & Triangle shapes.
 *   **v2.1.20**: Adaptive Tooltip sizing.
+
+## 2026-01-24: Folder Isolation & Source Type Compatibility Review
+**Session Goal:** Enhance Folder Manager robustness, support SPA navigation, and fix compatibility with diverse source types (YouTube, PDF).
+
+### 1. Data Isolation Strategy (v2.1.21)
+*   **Problem:** Folder data was global. Folders created in "Notebook A" appeared in "Notebook B", leading to confusion and data pollution.
+*   **Technical Challenge:** NotebookLM is a Single Page Application (SPA). Switching notebooks changes the URL but doesn't refresh the page, so the extension script doesn't automatically restart.
+*   **Solution:**
+    *   **Context Awareness:** Implemented `getNotebookId()` to parse the URL.
+    *   **Namespacing:** Changed storage keys from `nlm_folders` to `nlm_folders_${notebookId}`.
+    *   **SPA Listener:** Added a global `MutationObserver` on `document` to watch for URL changes, triggering a full data reload and UI reset when context changes.
+
+### 2. UX Optimization: Deletion (v2.1.22)
+*   **Problem:** Deleting folders required right-clicking, which was hidden and unintuitive.
+*   **Solution:**
+    *   Added an explicit **"×" button** on the active folder chip.
+    *   **Event Handling:** Used `e.stopPropagation()` strictly to ensure clicking "Delete" didn't mistakenly trigger "Select Folder".
+    *   **Safety:** Added `confirm()` dialogs to prevent accidental deletion.
+
+### 3. "The Invisible Update" Bug (v2.1.23)
+*   **Problem:** Users reported that after moving a file to a folder via the menu, nothing happened.
+*   **Analysis:** The data *was* saved, but the UI (the blue tags next to files) wasn't repainting.
+*   **Fix:**
+    *   Traced the `showFolderSelectionModal` save handler.
+    *   Explicitly added calls to `renderFileTags()` and `renderFolders()` immediately after data save.
+    *   Result: "Instant gratification" UI updates.
+
+### 4. Universal Source Support (v2.1.24)
+*   **Problem:** YouTube links, PDFs, and Audio files were **ignored** by the Batch Manager and Folder Tags.
+*   **Root Cause:** The extension relied on looking for `.row` elements. NotebookLM renders these special sources as standalone `.single-source-container` elements *without* a wrapper row.
+*   **Solution:**
+    *   **New Abstraction:** Created `getAllSourceRows()` helper function.
+    *   **Logic:** It queries for both standard rows AND standalone containers, merging them into a unified list.
+    *   **Adaptation:** Updated filename extraction logic to handle the internal structure of these standalone containers (which differs from standard rows).
+    *   **Impact:** YouTube/PDF sources now fully support Batch Select, Drag-and-Drop, and Visual Tags.
