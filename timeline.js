@@ -4,7 +4,9 @@ console.log("[NLM Timeline] Script loaded. Waiting for DOM...");
 const TIMELINE_CONFIG = {
   scrollContainerSelector: '.chat-panel-content',
   userTurnSelector: '.from-user-container',
+  userTextSelector: '.message-text-content p', // Confirmed selector
   barId: 'nlm-timeline-bar',
+  tooltipId: 'nlm-timeline-tooltip',
   paddingRight: '40px',
   maxRetries: 30, // 30 seconds max wait
   retryInterval: 1000
@@ -15,6 +17,7 @@ let timelineState = {
   bar: null,
   track: null,
   slider: null,
+  tooltip: null,
   markers: [],
   isScrolling: false,
   observer: null,
@@ -68,8 +71,6 @@ function initTimeline(container) {
 
   try {
     // 1. Prepare Parent Container
-    // We need to inject the bar into the parent of the scroll container,
-    // and make sure that parent is relative positioned.
     const parent = container.parentElement;
     if (!parent) {
       console.error("[NLM Timeline] Container has no parent!");
@@ -106,13 +107,13 @@ function initTimeline(container) {
 
 // --- UI Injection ---
 function injectTimelineUI(targetParent) {
-  // Cleanup old fixed bars if any
+  // Cleanup old elements
   const oldBar = document.getElementById(TIMELINE_CONFIG.barId);
-  if (oldBar) {
-    oldBar.remove();
-    console.log("[NLM Timeline] Removed old timeline bar.");
-  }
+  if (oldBar) oldBar.remove();
+  const oldTooltip = document.getElementById(TIMELINE_CONFIG.tooltipId);
+  if (oldTooltip) oldTooltip.remove();
 
+  // Create Bar
   const bar = document.createElement('div');
   bar.id = TIMELINE_CONFIG.barId;
   bar.className = 'nlm-timeline-bar';
@@ -123,14 +124,25 @@ function injectTimelineUI(targetParent) {
   const slider = document.createElement('div');
   slider.className = 'nlm-timeline-slider';
   
+  // Create Tooltip (hidden by default)
+  const tooltip = document.createElement('div');
+  tooltip.id = TIMELINE_CONFIG.tooltipId;
+  tooltip.className = 'nlm-timeline-tooltip';
+  
   track.appendChild(slider);
   bar.appendChild(track);
   
+  // Inject bar into parent
   targetParent.appendChild(bar);
+  
+  // Inject tooltip into bar (so it positions relative to bar)
+  // Or inject into track? Absolute positioning relative to bar works best.
+  bar.appendChild(tooltip);
 
   timelineState.bar = bar;
   timelineState.track = track;
   timelineState.slider = slider;
+  timelineState.tooltip = tooltip;
   console.log("[NLM Timeline] UI Injected into chat panel parent.");
 }
 
@@ -158,40 +170,46 @@ function recalculateMarkers() {
   const viewportHeight = timelineState.container.clientHeight;
   const scrollTop = timelineState.container.scrollTop;
   
-  // Debug info
-  // console.log(`[NLM Timeline] Geometry: H=${totalHeight}, View=${viewportHeight}, Scroll=${scrollTop}`);
-
   if (totalHeight <= viewportHeight) {
     timelineState.bar.style.display = 'none';
-    // console.log("[NLM Timeline] Content matches viewport, hiding bar.");
     return;
   }
 
-  // Calculate relative top for elements
-  // The logic: we want the element's position relative to the "start" of the scrolling content.
-  // container.scrollTop + rect.top - containerRect.top gives the offset from the top of the scrollable area.
   const containerRect = timelineState.container.getBoundingClientRect();
 
   userTurns.forEach((turn, index) => {
     const rect = turn.getBoundingClientRect();
-    
-    // Calculate absolute offset from the very top of the scrollable content
     const offsetFromTop = scrollTop + (rect.top - containerRect.top);
     
     // Normalize (0 to 1)
     let n = offsetFromTop / totalHeight;
     n = Math.max(0, Math.min(1, n));
 
-    // console.log(`[NLM Timeline] Turn ${index}: Top=${offsetFromTop}, n=${n.toFixed(3)}`);
+    // Extract Text
+    let tooltipText = `Question ${index + 1}`;
+    const textEl = turn.querySelector(TIMELINE_CONFIG.userTextSelector);
+    if (textEl && textEl.textContent) {
+        let rawText = textEl.textContent.trim();
+        if (rawText.length > 50) {
+            rawText = rawText.substring(0, 50) + '...';
+        }
+        tooltipText = rawText;
+    }
 
+    // Create Dot (Triangle)
     const dot = document.createElement('div');
     dot.className = 'nlm-timeline-dot';
     dot.style.setProperty('--n', n);
-    dot.title = `Question ${index + 1}`;
+    // dot.title = tooltipText; // Removed native title in favor of custom tooltip
     
+    // Hover Events for Tooltip
+    dot.addEventListener('mouseenter', () => showTooltip(tooltipText, n));
+    dot.addEventListener('mouseleave', () => hideTooltip());
+    
+    // Click to scroll
     dot.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log(`[NLM Timeline] Scrolling to Question ${index + 1} at ${offsetFromTop}px`);
+      console.log(`[NLM Timeline] Scrolling to Question ${index + 1}`);
       timelineState.container.scrollTo({
         top: offsetFromTop - 20, 
         behavior: 'smooth'
@@ -209,6 +227,23 @@ function recalculateMarkers() {
   });
 
   updateSlider();
+}
+
+function showTooltip(text, n) {
+    if (!timelineState.tooltip) return;
+    
+    timelineState.tooltip.textContent = text;
+    // Position tooltip vertically aligned with the dot
+    // Dot top is calc(12px + (100% - 24px) * n)
+    // We can use the same calc or just set top style
+    timelineState.tooltip.style.top = `calc(12px + (100% - 24px) * ${n})`;
+    
+    timelineState.tooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+    if (!timelineState.tooltip) return;
+    timelineState.tooltip.classList.remove('visible');
 }
 
 function updateSlider() {
@@ -248,7 +283,6 @@ function setupObservers(container) {
     );
 
     if (hasRelevantChange) {
-      // console.log("[NLM Timeline] Content mutation detected, scheduling recalc.");
       if (timelineState.debounceTimer) clearTimeout(timelineState.debounceTimer);
       timelineState.debounceTimer = setTimeout(recalculateMarkers, 300);
     }
@@ -261,7 +295,6 @@ function setupObservers(container) {
 
   // Resize Observer
   timelineState.resizeObserver = new ResizeObserver(() => {
-     // console.log("[NLM Timeline] Resize detected.");
      recalculateMarkers();
   });
   timelineState.resizeObserver.observe(container);
