@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.24] - 2026-01-24
+### Fixed
+- **Source Type Support**: 修复了 YouTube 链接、PDF 文件等 Source 无法被批量管理或显示分类标签的问题。
+  - **New Detection Strategy**: 引入了 `getAllSourceRows()` 辅助函数，除了识别标准的表格行 (`.row`)，现在也能识别独立的 `.single-source-container` 元素。
+  - **Tag Injection**: 优化了蓝色标签 (Tags) 的注入位置，确保在 YouTube/PDF 等特殊布局中也能正确插入到标题和复选框之间。
+  - **Batch Checkbox**: 确保批量管理模式下的复选框能正确注入到这些特殊 Source 中。
+  - **Filename Extraction**: 升级了文件名提取逻辑，支持直接从 Source Container 容器中提取标题。
+
 ## [2.1.23] - 2026-01-24
 ### Fixed
 - **UI Refresh**: 修复了通过右键菜单或拖拽添加文件到文件夹后，文件列表上的蓝色标签（Tags）未立即显示的问题。

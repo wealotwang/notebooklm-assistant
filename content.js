@@ -208,7 +208,9 @@ function startObserver() {
 
     if (shouldUpdateDraggable) makeSourcesDraggable();
     if (shouldUpdateBatch) updateBatchUI();
-    if (shouldUpdateTags || document.querySelectorAll('.row, div[role="row"]').length > 0) {
+    // 使用 getAllSourceRows 检查是否真的有 row，而不是依赖旧的选择器
+    const hasRows = getAllSourceRows().length > 0;
+    if (shouldUpdateTags || hasRows) {
         if (!state.renderTagsTimer) {
             state.renderTagsTimer = setTimeout(() => {
                 renderFileTags();
@@ -327,14 +329,38 @@ function toggleBatchMode() {
     updateBatchUI();
 }
 
+// --- Helper: Get All Source Rows (Standard + Standalone Containers) ---
+function getAllSourceRows() {
+    // 1. Standard rows
+    const standardRows = Array.from(document.querySelectorAll('.row, div[role="row"]'));
+    
+    // 2. Standalone containers (YouTube, PDF, Audio, etc.)
+    const standaloneContainers = Array.from(document.querySelectorAll('.single-source-container'));
+    
+    // 3. Merge and Deduplicate
+    // If a standalone container is inside a standard row, prefer the row (or filter out the container).
+    // Actually, our logic handles both, but let's ensure we don't process the same file twice.
+    const allItems = new Set(standardRows);
+    
+    standaloneContainers.forEach(container => {
+        // Check if this container is already inside one of the standard rows
+        const parentRow = container.closest('.row, div[role="row"]');
+        if (!parentRow) {
+            // It's a true standalone container
+            allItems.add(container);
+        }
+    });
+    
+    return Array.from(allItems);
+}
+
 function updateBatchUI() {
     // 1. 注入或移除 Checkboxes
-    // 我们复用 makeSourcesDraggable 里的逻辑来寻找 rows，但要更通用
-    const rows = document.querySelectorAll('.row, div[role="row"]');
+    const rows = getAllSourceRows();
     
     rows.forEach(row => {
         // 排除 Select All 行
-        if (row.innerText.includes('Select all sources')) return;
+        if (row.innerText && row.innerText.includes('Select all sources')) return;
 
         const existingCb = row.querySelector('.nlm-batch-checkbox');
         
@@ -358,6 +384,7 @@ function updateBatchUI() {
                 });
                 
                 // 插入到最前面
+                // 对于 standalone container, 结构可能不同，尝试插入到第一个子元素前
                 row.insertBefore(cb, row.firstChild);
             }
         } else {
@@ -543,7 +570,7 @@ function syncNativeSelectionFromView(view) {
     );
 
     // 2. 遍历原生列表，强制同步状态
-    const rows = document.querySelectorAll('.row, div[role="row"]');
+    const rows = getAllSourceRows();
     rows.forEach(row => {
         if (row.closest('.nlm-folder-container')) return;
         
@@ -689,7 +716,7 @@ function clearNativeSelection() {
         safeClick(selectAllInput);
     }
     
-    const rows = document.querySelectorAll('.row, div[role="row"]');
+    const rows = getAllSourceRows();
     rows.forEach(row => {
          if (row.closest('.nlm-folder-container')) return;
          if (row.querySelector('input[aria-label="Select all sources"]')) return;
@@ -922,9 +949,9 @@ function syncSingleFileToNative(fileName, targetState) {
 }
 
 function renderFileTags() {
-    const rows = document.querySelectorAll('.row, div[role="row"]');
+    const rows = getAllSourceRows();
     rows.forEach(row => {
-        if (row.innerText.includes('Select all sources')) return;
+        if (row.innerText && row.innerText.includes('Select all sources')) return;
         
         const fileName = extractFileNameFromRow(row);
         if (!fileName) return;
@@ -948,7 +975,19 @@ function renderFileTags() {
             if (menuBtn && menuBtn.parentElement === row) {
                  row.insertBefore(container, menuBtn);
             } else {
-                 row.appendChild(container);
+                 // 对于 standalone container, 结构可能稍微不同，
+                 // 通常 .source-title-column 是中间的，菜单是右边的。
+                 // 如果我们找不到明确的菜单按钮，append 到最后也行。
+                 // 但对于 standalone container, 它的直接子元素是: icon-and-menu, source-title-column, checkbox
+                 // 我们的 tags 最好放在 source-title-column 后面，或者 append 到 container 里。
+                 // 由于 container 是 flex，append 到最后会在 checkbox 后面（如果 checkbox 是最后）。
+                 // 让我们尝试找 checkbox container，插在它前面。
+                 const checkboxContainer = row.querySelector('.select-checkbox-container');
+                 if (checkboxContainer) {
+                     row.insertBefore(container, checkboxContainer);
+                 } else {
+                     row.appendChild(container);
+                 }
             }
         }
         
@@ -1063,8 +1102,14 @@ const DOMService = {
     }
 
     // Strategy 1: .single-source-container (Highest Priority per User Request)
-    // The user explicitly pointed out this container holds the correct data.
-    const singleSourceContainer = row.querySelector('.single-source-container');
+    // Checks if the row itself IS the container, or contains one.
+    let singleSourceContainer = null;
+    if (row.classList.contains('single-source-container')) {
+        singleSourceContainer = row;
+    } else {
+        singleSourceContainer = row.querySelector('.single-source-container');
+    }
+
     if (singleSourceContainer) {
         const title = singleSourceContainer.querySelector('.source-title');
         if (title) {
