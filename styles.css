@@ -396,21 +396,27 @@
   position: absolute;
   right: 35px; /* Left of the bar */
   /* Top will be set dynamically */
-  background-color: rgba(32, 33, 36, 0.9);
+  background-color: rgba(32, 33, 36, 0.95); /* Slightly darker for better contrast */
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  max-width: 200px;
+  font-size: 13px; /* Increased font size */
+  line-height: 1.5;
+  max-width: 300px; /* Increased width */
   white-space: normal;
   pointer-events: none;
   opacity: 0;
   transform: translateY(-50%) translateX(10px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 1000;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  
+  /* Multi-line truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .nlm-timeline-tooltip.visible {
