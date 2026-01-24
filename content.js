@@ -9,39 +9,103 @@ let state = {
   activeFolderId: 'all',
   currentMenuFile: null, // 当前正在操作菜单的文件名
   isBatchMode: false,
-  selectedBatchFiles: new Set()
+  selectedBatchFiles: new Set(),
+  currentNotebookId: null // 当前笔记本ID
 };
 
 // --- 初始化 ---
 function init() {
+  state.currentNotebookId = getNotebookId();
+  console.log(`NotebookLM Folder Manager: Initializing for notebook "${state.currentNotebookId || 'global'}"`);
+  
   loadData(() => {
     startObserver();
     setupGlobalClickListener(); // 监听全局点击以捕获菜单
+    setupNavigationListener(); // 监听路由变化
   });
 }
 
+// --- 路由监听 (SPA) ---
+function setupNavigationListener() {
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    const url = location.href;
+    if (url !== lastUrl) {
+      lastUrl = url;
+      const newId = getNotebookId();
+      if (newId !== state.currentNotebookId) {
+        console.log(`NotebookLM Extension: Notebook changed from ${state.currentNotebookId} to ${newId}`);
+        state.currentNotebookId = newId;
+        // 重置 UI 状态
+        state.activeFolderId = 'all';
+        state.isBatchMode = false;
+        state.selectedBatchFiles.clear();
+        
+        // 重新加载数据
+        loadData(() => {
+          // 清除旧的 UI
+          const container = document.querySelector('.nlm-folder-container');
+          if (container) container.remove();
+          
+          // 重新渲染会由 startObserver 中的检查逻辑触发，或者我们可以手动触发一次
+          // 但 startObserver 会检测到没有 container 并重新注入
+          // 为了更稳健，手动触发一次注入检查
+          const injectionPoint = findInjectionPoint();
+          if (injectionPoint) {
+             injectFolderUI(injectionPoint);
+          }
+        });
+      }
+    }
+  }).observe(document, {subtree: true, childList: true});
+}
+
+function getNotebookId() {
+  const match = window.location.pathname.match(/\/notebook\/([a-zA-Z0-9-]+)/);
+  return match ? match[1] : null;
+}
+
 function loadData(callback) {
-  chrome.storage.local.get(['nlm_folders', 'nlm_mappings'], (result) => {
-    if (result.nlm_folders) {
-      state.folders = result.nlm_folders;
+  const notebookId = state.currentNotebookId;
+  // 如果没有 notebookId (比如在主页)，我们可能不加载或者加载全局？
+  // 暂时策略：如果没有 ID，加载一个空的或全局的。但用户说是在笔记本内。
+  // 我们使用带前缀的 key。
+  
+  const foldersKey = notebookId ? `nlm_folders_${notebookId}` : 'nlm_folders_global';
+  const mappingsKey = notebookId ? `nlm_mappings_${notebookId}` : 'nlm_mappings_global';
+
+  chrome.storage.local.get([foldersKey, mappingsKey], (result) => {
+    if (result[foldersKey]) {
+      state.folders = result[foldersKey];
     } else {
+      // 初始化默认文件夹 (每个新笔记本都是空的，除了"全部")
       state.folders = [
-        { id: 'all', name: '全部', type: 'system' },
-        { id: 'wiki', name: '产品Wiki', type: 'user' },
-        { id: 'learning', name: '个人学习', type: 'user' }
+        { id: 'all', name: '全部', type: 'system' }
+        // 不再预置 "产品Wiki" 等，保持干净
       ];
       saveData();
     }
-    if (result.nlm_mappings) state.fileMappings = result.nlm_mappings;
+    
+    if (result[mappingsKey]) {
+      state.fileMappings = result[mappingsKey];
+    } else {
+      state.fileMappings = {};
+    }
+    
     if (callback) callback();
   });
 }
 
 function saveData() {
-  chrome.storage.local.set({
-    'nlm_folders': state.folders,
-    'nlm_mappings': state.fileMappings
-  });
+  const notebookId = state.currentNotebookId;
+  const foldersKey = notebookId ? `nlm_folders_${notebookId}` : 'nlm_folders_global';
+  const mappingsKey = notebookId ? `nlm_mappings_${notebookId}` : 'nlm_mappings_global';
+  
+  const data = {};
+  data[foldersKey] = state.folders;
+  data[mappingsKey] = state.fileMappings;
+  
+  chrome.storage.local.set(data);
 }
 
 // --- DOM 监听 ---
@@ -359,6 +423,15 @@ function renderFolders() {
     
     li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span>${folder.name}</span>`;
     
+    // 右键菜单 (删除功能)
+    if (folder.id !== 'all') {
+      li.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showFolderContextMenu(e.clientX, e.clientY, folder);
+      });
+    }
+
     li.addEventListener('click', (e) => {
       e.stopPropagation();
       state.activeFolderId = folder.id;
@@ -387,6 +460,61 @@ function renderFolders() {
     }
     list.appendChild(li);
   });
+}
+
+// --- 文件夹右键菜单 ---
+function showFolderContextMenu(x, y, folder) {
+  // 清除旧菜单
+  const oldMenu = document.querySelector('.nlm-context-menu');
+  if (oldMenu) oldMenu.remove();
+
+  const menu = document.createElement('div');
+  menu.className = 'nlm-context-menu';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  menu.innerHTML = `
+    <div class="nlm-context-menu-item danger" id="nlm-ctx-delete">删除文件夹</div>
+  `;
+
+  document.body.appendChild(menu);
+
+  // 点击外部关闭
+  const closeMenu = () => {
+    menu.remove();
+    document.removeEventListener('click', closeMenu);
+  };
+  // 延迟绑定，防止当前点击立即触发关闭
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
+
+  // 绑定事件
+  menu.querySelector('#nlm-ctx-delete').addEventListener('click', () => {
+    if (confirm(`确定要删除文件夹 "${folder.name}" 吗？\n文件夹内的文件将移至"全部"。`)) {
+      deleteFolder(folder.id);
+    }
+  });
+}
+
+function deleteFolder(folderId) {
+  // 1. 从文件夹列表移除
+  state.folders = state.folders.filter(f => f.id !== folderId);
+  
+  // 2. 从所有文件映射中移除该 ID
+  Object.keys(state.fileMappings).forEach(fileName => {
+    state.fileMappings[fileName] = state.fileMappings[fileName].filter(id => id !== folderId);
+    // 如果文件没有归属任何文件夹，可以保留空数组或删除 key (视逻辑而定，这里保留空数组)
+  });
+  
+  // 3. 如果当前正在查看被删除的文件夹，切回"全部"
+  if (state.activeFolderId === folderId) {
+    state.activeFolderId = 'all';
+    hideDetailView();
+    showNativeList();
+  }
+  
+  saveData();
+  renderFolders();
+  renderFileTags(); // 更新标签显示
 }
 
 // --- 原生选择同步辅助函数 ---

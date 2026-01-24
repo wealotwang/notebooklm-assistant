@@ -318,7 +318,34 @@
   -webkit-box-orient: vertical;
 }
 
-/* --- NotebookLM Timeline --- */
+/* Context Menu for Folder */
+.nlm-context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 10000;
+  min-width: 120px;
+  padding: 4px 0;
+}
+
+.nlm-context-menu-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #3c4043;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.nlm-context-menu-item:hover {
+  background-color: #f1f3f4;
+}
+
+.nlm-context-menu-item.danger {
+  color: #d93025;
+}
 .nlm-timeline-bar {
   position: absolute; /* Changed from fixed */
   top: 0;
