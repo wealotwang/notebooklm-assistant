@@ -67,19 +67,35 @@ function initTimeline(container) {
   console.log("[NLM Timeline] Initializing UI...");
 
   try {
-    // 1. Inject UI
-    injectTimelineUI();
+    // 1. Prepare Parent Container
+    // We need to inject the bar into the parent of the scroll container,
+    // and make sure that parent is relative positioned.
+    const parent = container.parentElement;
+    if (!parent) {
+      console.error("[NLM Timeline] Container has no parent!");
+      return;
+    }
 
-    // 2. Adjust Layout
+    // Force relative positioning on parent so absolute children align to it
+    const parentStyle = window.getComputedStyle(parent);
+    if (parentStyle.position === 'static') {
+      parent.style.position = 'relative';
+      console.log("[NLM Timeline] Set parent position to relative.");
+    }
+
+    // 2. Inject UI into Parent
+    injectTimelineUI(parent);
+
+    // 3. Adjust Layout
     container.style.paddingRight = TIMELINE_CONFIG.paddingRight;
     container.style.boxSizing = 'border-box';
     console.log(`[NLM Timeline] Added padding-right: ${TIMELINE_CONFIG.paddingRight} to container.`);
 
-    // 3. Setup Observers
+    // 4. Setup Observers
     setupObservers(container);
     setupListeners(container);
 
-    // 4. Initial Render
+    // 5. Initial Render
     recalculateMarkers();
 
     console.log("[NLM Timeline] Initialization complete.");
@@ -89,10 +105,12 @@ function initTimeline(container) {
 }
 
 // --- UI Injection ---
-function injectTimelineUI() {
-  if (document.getElementById(TIMELINE_CONFIG.barId)) {
-    console.log("[NLM Timeline] UI already exists, skipping injection.");
-    return;
+function injectTimelineUI(targetParent) {
+  // Cleanup old fixed bars if any
+  const oldBar = document.getElementById(TIMELINE_CONFIG.barId);
+  if (oldBar) {
+    oldBar.remove();
+    console.log("[NLM Timeline] Removed old timeline bar.");
   }
 
   const bar = document.createElement('div');
@@ -107,12 +125,13 @@ function injectTimelineUI() {
   
   track.appendChild(slider);
   bar.appendChild(track);
-  document.body.appendChild(bar);
+  
+  targetParent.appendChild(bar);
 
   timelineState.bar = bar;
   timelineState.track = track;
   timelineState.slider = slider;
-  console.log("[NLM Timeline] UI Injected into body.");
+  console.log("[NLM Timeline] UI Injected into chat panel parent.");
 }
 
 // --- Logic ---
