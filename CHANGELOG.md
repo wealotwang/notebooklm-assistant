@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.20] - 2026-01-24
+### Improved
+- **UI**: 深度优化 Tooltip 尺寸自适应逻辑。
+  - **Adaptive Width**: 采用 `width: max-content` 配合 `max-width: 400px`，实现短文本紧凑、长文本换行的智能布局。
+  - **Layout**: 设定单行最大承载约 25 个汉字，超过后自动换行。
+  - **Truncation**: 保持最多显示 3 行（约 50-60 字）的视觉限制，超出部分以省略号显示。
+
 ## [2.1.19] - 2026-01-24
 ### Improved
 - **UI**: 优化了 Timeline Tooltip 的视觉体验。

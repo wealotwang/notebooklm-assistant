@@ -402,8 +402,15 @@
   border-radius: 8px;
   font-size: 13px; /* Increased font size */
   line-height: 1.5;
-  max-width: 300px; /* Increased width */
-  white-space: normal;
+  
+  /* Adaptive Width Logic */
+  width: max-content;   /* Shrink to fit content */
+  min-width: 60px;      /* Minimum width for very short text */
+  max-width: 400px;     /* Max width (approx 25 chars + padding) */
+  
+  white-space: pre-wrap; /* Preserve whitespace but allow wrapping */
+  word-break: break-word; /* Prevent overflow */
+  
   pointer-events: none;
   opacity: 0;
   transform: translateY(-50%) translateX(10px);
@@ -412,9 +419,9 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   font-family: 'Google Sans', Roboto, Arial, sans-serif;
   
-  /* Multi-line truncation */
+  /* Multi-line truncation logic */
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 3; /* Limit to approx 3 lines (fits ~50 chars with 25 chars/line) */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
