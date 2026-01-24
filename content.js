@@ -1349,7 +1349,11 @@ function showFolderSelectionModal(fileName, batchFileNames = null) {
         toggleBatchMode();
     }
 
-    // 如果当前在看某个文件夹，刷新一下
+    // 刷新 UI：Tags 和 Folders
+    renderFileTags();
+    renderFolders();
+
+    // 如果当前在看某个文件夹，刷新详情视图
     if (state.activeFolderId !== 'all') showDetailView(state.folders.find(f => f.id === state.activeFolderId));
     alert(isBatch ? `已更新 ${targetFiles.length} 个文件的归类` : `已更新文件夹归类`);
   });
@@ -1381,6 +1385,7 @@ function addFileToFolder(fileName, folderId) {
   if (!state.fileMappings[fileName].includes(folderId)) {
     state.fileMappings[fileName].push(folderId);
     saveData();
+    renderFileTags(); // 立即更新标签
     console.log(`Added "${fileName}" to folder "${folderId}"`);
   }
 }
