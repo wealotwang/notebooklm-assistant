@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.22] - 2026-01-24
+### Improved
+- **UI/UX**: 优化文件夹删除体验。
+  - 在当前激活的文件夹（Active Folder）名称旁新增显式的 "×" 删除按钮。
+  - 移除了之前的右键菜单删除方式，操作更直观。
+  - 删除时增加确认弹窗，防止误操作。
+
+## [2.1.21] - 2026-01-24
+### Added
+- **Core**: 实现了 Notebook 维度的数据隔离（Isolation）。
+  - **Context Awareness**: 插件现在能识别当前 URL 中的 Notebook ID。
+  - **Namespace Storage**: 文件夹配置和文件归类数据现在按 Notebook ID 独立存储，互不干扰。
+  - **SPA Support**: 监听 URL 变化，在切换笔记本时自动重载对应的文件夹数据。
+- **Feature**: 实现了基础的文件夹删除功能（右键菜单）。
+
 ## [2.1.20] - 2026-01-24
 ### Improved
 - **UI**: 深度优化 Tooltip 尺寸自适应逻辑。

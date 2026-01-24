@@ -58,11 +58,43 @@
   }
   
   /* 选中状态 */
-  .nlm-folder-item.active {
-    background-color: #e8f0fe;
-    color: #1967d2;
-    border-color: #e8f0fe;
-  }
+.nlm-folder-item.active {
+  background-color: #e8f0fe;
+  color: #1967d2;
+  border-color: #e8f0fe;
+  padding-right: 8px; /* Reduce padding to accommodate close button */
+}
+
+/* 文件夹移除按钮 */
+.nlm-folder-remove {
+  display: none; /* Hidden by default */
+  margin-left: 6px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 14px;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nlm-folder-remove:hover {
+  background-color: #fce8e6;
+  color: #d93025;
+}
+
+/* Show remove button when active */
+.nlm-folder-item.active .nlm-folder-remove {
+  display: inline-block;
+  color: #1967d2; /* Match active text color initially */
+}
+
+.nlm-folder-item.active .nlm-folder-remove:hover {
+  background-color: #fce8e6;
+  color: #d93025; /* Red on hover */
+}
   
   /* 拖拽悬停状态 */
   .nlm-folder-item.drag-over {

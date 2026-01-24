@@ -421,9 +421,25 @@ function renderFolders() {
     let iconPath = 'M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z';
     if (folder.id === 'all') iconPath = 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z'; 
     
-    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span>${folder.name}</span>`;
+    let removeBtnHtml = '';
+    if (folder.id !== 'all') {
+        removeBtnHtml = `<span class="nlm-folder-remove" title="删除文件夹">×</span>`;
+    }
+
+    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span>${folder.name}</span>${removeBtnHtml}`;
     
-    // 右键菜单 (删除功能)
+    // 绑定删除按钮事件
+    const removeBtn = li.querySelector('.nlm-folder-remove');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`确定要删除文件夹 "${folder.name}" 吗？\n文件夹内的文件将移至"全部"。`)) {
+                deleteFolder(folder.id);
+            }
+        });
+    }
+    
+    // 右键菜单 (删除功能) - 保留作为备用
     if (folder.id !== 'all') {
       li.addEventListener('contextmenu', (e) => {
         e.preventDefault();
