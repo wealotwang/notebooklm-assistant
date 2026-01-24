@@ -1443,7 +1443,8 @@ function showFolderSelectionModal(fileName, batchFileNames = null) {
 
     // 如果当前在看某个文件夹，刷新详情视图
     if (state.activeFolderId !== 'all') showDetailView(state.folders.find(f => f.id === state.activeFolderId));
-    alert(isBatch ? `已更新 ${targetFiles.length} 个文件的归类` : `已更新文件夹归类`);
+    // alert(isBatch ? `已更新 ${targetFiles.length} 个文件的归类` : `已更新文件夹归类`);
+    console.log(`NotebookLM Extension: Updated folders for ${targetFiles.length} files.`);
   });
 }
 

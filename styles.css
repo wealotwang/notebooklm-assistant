@@ -153,8 +153,13 @@
   .nlm-batch-checkbox {
       margin-right: 12px;
       cursor: pointer;
-      width: 20px;
-      height: 20px;
+      width: 18px !important;
+      height: 18px !important;
+      min-width: 18px; /* Prevent shrinking in flex containers */
+      min-height: 18px;
+      flex-shrink: 0;  /* Critical for consistency */
+      box-sizing: border-box;
+      
       /* 自定义外观，使其更明显 */
       accent-color: #1a73e8;
       z-index: 1002; /* 确保在蒙层之上 */
