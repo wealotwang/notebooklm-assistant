@@ -320,6 +320,17 @@ function toggleBatchMode() {
     state.isBatchMode = !state.isBatchMode;
     state.selectedBatchFiles.clear();
     
+    // 切换 Body 类名，触发 CSS 屏蔽效果
+    if (state.isBatchMode) {
+        document.body.classList.add('nlm-batch-mode-active');
+    } else {
+        document.body.classList.remove('nlm-batch-mode-active');
+        // 清除所有行的高亮
+        document.querySelectorAll('.nlm-batch-row-active').forEach(row => {
+            row.classList.remove('nlm-batch-row-active');
+        });
+    }
+
     const btn = document.querySelector('.nlm-batch-toggle');
     if (btn) {
         btn.style.color = state.isBatchMode ? '#1a73e8' : '#5f6368';
@@ -377,8 +388,13 @@ function updateBatchUI() {
                 cb.addEventListener('change', (e) => {
                     const fileName = extractFileNameFromRow(row);
                     if (fileName) {
-                        if (e.target.checked) state.selectedBatchFiles.add(fileName);
-                        else state.selectedBatchFiles.delete(fileName);
+                        if (e.target.checked) {
+                            state.selectedBatchFiles.add(fileName);
+                            row.classList.add('nlm-batch-row-active');
+                        } else {
+                            state.selectedBatchFiles.delete(fileName);
+                            row.classList.remove('nlm-batch-row-active');
+                        }
                         renderBatchToolbar();
                     }
                 });
@@ -387,8 +403,35 @@ function updateBatchUI() {
                 // 对于 standalone container, 结构可能不同，尝试插入到第一个子元素前
                 row.insertBefore(cb, row.firstChild);
             }
+            
+            // 绑定行点击事件 (Focus Mode Interaction)
+            if (!row.hasAttribute('data-nlm-batch-listener')) {
+                row.setAttribute('data-nlm-batch-listener', 'true');
+                row.addEventListener('click', (e) => {
+                    // 仅在批量模式下生效
+                    if (!state.isBatchMode) return;
+                    
+                    // 如果点击的是我们的 checkbox 或者菜单按钮，不处理（避免冲突）
+                    if (e.target.classList.contains('nlm-batch-checkbox') || 
+                        e.target.closest('button') || 
+                        e.target.closest('.nlm-tags-container')) return;
+                    
+                    // 阻止默认行为（防止打开文件）
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // 切换 checkbox 状态
+                    const cb = row.querySelector('.nlm-batch-checkbox');
+                    if (cb) {
+                        cb.checked = !cb.checked;
+                        cb.dispatchEvent(new Event('change')); // 触发 change 事件更新状态
+                    }
+                }, true); // Use capture to intercept early
+            }
         } else {
             if (existingCb) existingCb.remove();
+            row.classList.remove('nlm-batch-row-active'); // 退出模式时清除高亮
+            // 注意：我们留着 click listener 没关系，因为里面检查了 state.isBatchMode
         }
     });
     

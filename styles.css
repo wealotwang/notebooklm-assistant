@@ -153,8 +153,48 @@
   .nlm-batch-checkbox {
       margin-right: 12px;
       cursor: pointer;
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
+      /* 自定义外观，使其更明显 */
+      accent-color: #1a73e8;
+      z-index: 1002; /* 确保在蒙层之上 */
+      position: relative;
+  }
+
+  /* --- 批量模式专注体验 (Focus Mode) --- */
+  
+  /* 1. 全局蒙层效果：当批量模式激活时，让 body 内的某些元素变暗 */
+  /* 由于很难精确控制所有元素的层级，我们主要针对原生 Checkbox 做处理 */
+  
+  /* 2. 屏蔽原生 Checkbox */
+  body.nlm-batch-mode-active .select-checkbox-container,
+  body.nlm-batch-mode-active .mdc-checkbox,
+  body.nlm-batch-mode-active mat-checkbox:not(.nlm-folder-checkbox-item input) {
+      opacity: 0.1 !important;
+      pointer-events: none !important;
+      filter: grayscale(100%);
+  }
+
+  /* 3. 高亮行样式 */
+  .nlm-batch-row-active {
+      background-color: rgba(26, 115, 232, 0.08) !important; /* 浅蓝色背景 */
+      position: relative;
+      z-index: 1001;
+      border-radius: 4px;
+  }
+  
+  /* 4. 增强插件 Checkbox 的可见性 */
+  body.nlm-batch-mode-active .nlm-batch-checkbox {
+      box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.1);
+      border-radius: 2px;
+  }
+  
+  /* 5. 鼠标悬停在行上时的效果 */
+  body.nlm-batch-mode-active .row:hover,
+  body.nlm-batch-mode-active div[role="row"]:hover,
+  body.nlm-batch-mode-active .single-source-container:hover {
+      cursor: pointer;
+      background-color: rgba(0, 0, 0, 0.04); /* 轻微高亮，提示可点击 */
   }
 
   /* 批量操作工具栏 */
