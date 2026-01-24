@@ -317,3 +317,75 @@
   -webkit-line-clamp: 2; /* 最多显示2行 */
   -webkit-box-orient: vertical;
 }
+
+/* --- NotebookLM Timeline --- */
+.nlm-timeline-bar {
+  position: fixed;
+  top: 60px; /* Adjust based on header height */
+  right: 12px;
+  width: 24px;
+  height: calc(100vh - 80px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 12px;
+  background-color: rgba(248, 250, 252, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 0.3s ease;
+}
+
+.nlm-timeline-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.nlm-timeline-dot {
+  position: absolute;
+  left: 50%;
+  /* --n is a value from 0 to 1 representing position */
+  top: calc(12px + (100% - 24px) * var(--n, 0));
+  transform: translate(-50%, -50%);
+  width: 30px; /* Hit area */
+  height: 30px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.nlm-timeline-dot::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.nlm-timeline-dot:hover::after {
+  transform: scale(1.4);
+  background-color: #1a73e8;
+}
+
+.nlm-timeline-dot.active::after {
+  background-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.3);
+}
+
+.nlm-timeline-slider {
+  position: absolute;
+  left: -8px; /* To the left of the bar */
+  width: 4px;
+  height: 40px; /* Approximate viewport height indicator */
+  background-color: #1a73e8;
+  border-radius: 2px;
+  pointer-events: none; /* Let clicks pass through to track if needed */
+  transition: top 0.1s linear;
+  display: none; /* Hidden by default, shown via JS */
+}
+

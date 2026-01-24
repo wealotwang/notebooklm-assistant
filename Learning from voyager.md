@@ -1,58 +1,25 @@
-# Learning from Voyager
 
-**Notice to AI Assistants:**
-This document serves as a persistent knowledge base and context handover for the "NotebookLM Folder Tool" project. It records key insights, architectural analyses, and implementation details learned from studying reference projects (like `gemini-voyager`).
-**When starting a new session or task, please review this document to understand previous learnings.**
-**If you discover new patterns, techniques, or insights during your analysis, please append them to this document with a clear date and topic header.**
+## 2026-01-24: NotebookLM Timeline Implementation
+**Topic:** Adapting the Voyager timeline concept to NotebookLM's specific DOM structure.
 
----
+### 1. DOM Structure Discovery
+Unlike Gemini (which uses Angular-specific classes like `.user-query-bubble`), NotebookLM uses a different structure:
+- **Scroll Container:** `.chat-panel-content` (This is the element with `overflow-y: scroll`).
+- **User Anchors:** `.from-user-container` (Wraps the entire user message block).
 
-## 2026-01-24: Timeline & Custom Scrollbar Implementation
-**Topic:** How `gemini-voyager` implements its custom timeline/scrollbar overlay without modifying the native browser scrollbar.
+### 2. Implementation Strategy (`timeline.js`)
+We implemented a lightweight, standalone script `timeline.js` that:
+1.  **Injection:** Dynamically appends a `.nlm-timeline-bar` to the `body`.
+2.  **Layout Protection:** Adds `padding-right: 40px` to `.chat-panel-content` to prevent the timeline from obscuring chat text.
+3.  **Positioning Logic:**
+    - Iterates over all `.from-user-container` elements.
+    - Calculates their position relative to the *scrollable content top* using: `el.getBoundingClientRect().top - containerRect.top + container.scrollTop`.
+    - Normalizes this to a `0.0 - 1.0` value for CSS positioning.
+4.  **Reactivity:**
+    - Uses `MutationObserver` to detect new messages and re-render dots.
+    - Uses `ResizeObserver` to handle window resizing.
+    - Uses `scroll` listener to update the slider position.
 
-### 1. Core Concept: "Shadow" Navigation
-The plugin does not style the native `::-webkit-scrollbar`. Instead, it creates a completely separate UI component ("Timeline") that acts as a visual map and navigation controller.
-- **Left/Main:** Native content with standard scrolling (often hidden or ignored).
-- **Right/Overlay:** A fixed-position `div` representing the timeline.
-- **Sync:** A bidirectional binding between the main content's scroll position and the timeline's slider/dots.
-
-### 2. Implementation Breakdown (Source: `src/pages/content/timeline/manager.ts`)
-
-#### A. Finding the Scroll Container
-The plugin dynamically locates the scrollable area:
-1.  Identifies "User Turn" elements (chat bubbles) as anchors.
-2.  Traverses up the DOM to find the first parent with `overflow-y: auto` or `scroll`.
-3.  This becomes the `scrollContainer` for event listeners.
-
-#### B. Layout Space Injection
-To prevent the overlay from obscuring content, it injects CSS to "squeeze" the original page:
-```css
-/* src/pages/content/chatWidth/index.ts */
-chat-window, .chat-container {
-  padding-right: 10px !important; /* Reserves space */
-  box-sizing: border-box !important;
-}
-```
-
-#### C. Geometry & CSS Variable Positioning
-The positioning logic is a hybrid of TypeScript calculation and CSS rendering:
-1.  **Normalization:** The TS code calculates a normalized position `n` (0.0 to 1.0) for each message based on its `offsetTop` relative to the total content height.
-2.  **CSS Variables:** Instead of setting `top: 123px` on every dot, it sets a CSS variable:
-    ```typescript
-    dot.style.setProperty('--n', String(this.markers[i].n));
-    ```
-3.  **Efficient Rendering:** CSS handles the final pixel placement:
-    ```css
-    .timeline-dot {
-      top: calc(var(--timeline-track-padding) + (100% - 2 * var(--timeline-track-padding)) * var(--n, 0));
-    }
-    ```
-
-#### D. Bidirectional Synchronization
-- **Scroll -> Timeline:** `scrollContainer.addEventListener('scroll', ...)` updates the slider's `top` position.
-- **Timeline -> Scroll:** Dragging the slider calculates the target scroll percentage and calls `scrollContainer.scrollTo()`.
-
-### 3. Key Takeaways for Our Project
-- **Observer Patterns:** Use `MutationObserver` for dynamic content (chat streams) and `ResizeObserver` for responsive layout.
-- **Performance:** Offload layout calculations to CSS variables where possible to reduce JS main thread work.
-- **Non-Destructive:** Do not fight the browser's native scrollbar; instead, create a parallel control structure and sync them.
+### 3. Key Differences from Gemini Voyager
+- **Simpler Architecture:** Instead of a complex TypeScript class with event buses, we used a straightforward functional approach in vanilla JS (`timeline.js`), fitting the existing project structure.
+- **Direct CSS Injection:** Styles are appended to the existing `styles.css` but namespaced with `.nlm-timeline-` to avoid conflicts.

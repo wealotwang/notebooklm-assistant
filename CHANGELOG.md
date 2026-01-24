@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.18] - 2026-01-24
+### Added
+- **Feature**: 引入了 Voyager 风格的“时间轴滚动条 (Timeline)”。
+  - **Function**: 在右侧悬浮显示一个带有锚点的滚动条，直观展示所有“用户提问”的位置。
+  - **Interaction**: 点击圆点可快速跳转到对应提问，滑动滑块可控制页面滚动。
+  - **Design**: 采用 Shadow Overlay 设计，不修改原生滚动条，通过 `MutationObserver` 动态监听新消息上屏。
+- **Debug**: 增强了 `timeline.js` 的初始化逻辑，引入 Observer Sentinel 机制，确保在 DOM 元素延迟加载时也能正确注入。
+
+
 ## [2.1.17] - 2026-01-22
 ### Fixed
 - **Sync Architecture**: 彻底重构了双向同步的查找逻辑 (Checkbox-First Approach)。
