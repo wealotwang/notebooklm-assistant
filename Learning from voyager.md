@@ -85,3 +85,37 @@
 ### 2. 细节打磨 (v2.1.26)
 *   **样式统一:** 强制 Checkbox 尺寸为 18px，锁定 `flex-shrink: 0`，防止在复杂布局（如长标题）中变形。
 *   **移除干扰:** 移除了操作成功后的 `alert()` 弹窗，改为无打扰的 Console Log 和即时的视觉变化。
+
+## 2026-01-25: Gemini 适配与架构回滚 (Phase 3)
+**本次目标:** 将 NotebookLM 的文件夹和时间轴功能移植到 Google Gemini，并应对复杂的 SPA 结构。
+
+### 1. 注入策略的教训：父容器 vs Body
+*   **背景:** Gemini 的 DOM 结构极其复杂且高度动态，没有像 NotebookLM 那样稳定的滚动容器。
+*   **错误尝试 (Body Injection):**
+    *   为了规避寻找特定容器的困难，我们尝试将 Timeline 直接注入 `document.body` 并使用 `position: fixed`。
+    *   **后果:**
+        *   **同步困难:** 需要复杂的 JS 逻辑来计算 `top/left` 以跟随主内容区。
+        *   **性能问题:** `MutationObserver` 监听 Body 变化导致大量无效触发。
+        *   **Z-Index 战争:** 容易被 Gemini 的弹窗、Header 遮挡。
+*   **正确路径 (Parent Injection):**
+    *   最终回滚到寻找特定的内容父容器 (即使它嵌套很深)。
+    *   **关键技术:**
+        *   使用 `element.closest()` 或精确的 `querySelector` 找到内容包裹层。
+        *   强制该父容器 `position: relative` (这是关键！)。
+        *   子元素使用 `position: absolute; right: 0; height: 100%`。
+    *   **收益:** 布局由浏览器 CSS 引擎自动处理，无需一行 JS 代码来管理位置，极大地提高了稳定性。
+
+### 2. 诊断优先 (Diagnostics First)
+*   **痛点:** 用户反馈“功能失效”，但在开发者机器上无法复现。
+*   **改进:** 建立了标准化的诊断日志格式 `[Gemini Timeline] Diagnostic: ...`。
+    *   记录关键容器是否存在。
+    *   记录目标元素 (如 User Turns) 的数量。
+    *   记录父容器的 Computed Style (如 `position` 属性)。
+*   **价值:** 这种“遥测”能力让我们能迅速区分是“逻辑错误”还是“环境差异”。
+
+### 3. SPA 路由监听的差异
+*   **NotebookLM:** URL 变化直接反映 Context 变化。
+*   **Gemini:** URL 可能不变，或者变化滞后。
+*   **解决方案:** 混合监听策略。
+    *   监听 URL 变化。
+    *   **同时** 监听核心 DOM 节点 (如 `h1.title` 或对话列表容器) 的移除/添加，作为 Context 切换的信号。

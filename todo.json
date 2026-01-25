@@ -1,0 +1,52 @@
+{
+  "todos": [
+    {
+      "id": "1",
+      "content": "Revert timeline_gemini.js logic to v3.0.0.2 (Parent Injection)",
+      "priority": "high",
+      "status": "completed"
+    },
+    {
+      "id": "2",
+      "content": "Add diagnostic logs to timeline_gemini.js",
+      "priority": "medium",
+      "status": "completed"
+    },
+    {
+      "id": "3",
+      "content": "Update manifest.json version to 3.0.0.10",
+      "priority": "medium",
+      "status": "completed"
+    },
+    {
+      "id": "4",
+      "content": "Update CHANGELOG.md with rollback details",
+      "priority": "medium",
+      "status": "completed"
+    },
+    {
+      "id": "5",
+      "content": "Project Review: Update Project_Review_Timeline.md with v3.0.0+ saga",
+      "priority": "high",
+      "status": "completed"
+    },
+    {
+      "id": "6",
+      "content": "Project Review: Update Learning from voyager.md with technical lessons",
+      "priority": "medium",
+      "status": "completed"
+    },
+    {
+      "id": "7",
+      "content": "NotebookLM: Implement folder renaming (double-click)",
+      "priority": "high",
+      "status": "completed"
+    },
+    {
+      "id": "8",
+      "content": "NotebookLM: Fix source deletion sync (ghost files)",
+      "priority": "high",
+      "status": "completed"
+    }
+  ]
+}

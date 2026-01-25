@@ -1,14 +1,17 @@
-
-console.log("[NLM Timeline] Script loaded. Waiting for DOM...");
+console.log("[Gemini Timeline] Script loaded. Waiting for DOM...");
 
 const TIMELINE_CONFIG = {
-  scrollContainerSelector: '.chat-panel-content',
-  userTurnSelector: '.from-user-container',
-  userTextSelector: '.message-text-content p', // Confirmed selector
+  // Target the infinite-scroller which is the scrollable element
+  // BUT also include the parent ID just in case, as per v3.0.0.3 logic
+  scrollContainerSelector: 'infinite-scroller, #chat-history-scroll-container',
+  // User queries in Gemini usually have this class (based on Voyager)
+  userTurnSelector: '.user-query-bubble-with-background, user-query', 
+  // Text inside the query
+  userTextSelector: 'p, .text', 
   barId: 'nlm-timeline-bar',
   tooltipId: 'nlm-timeline-tooltip',
   paddingRight: '40px',
-  maxRetries: 30, // 30 seconds max wait
+  maxRetries: 30, 
   retryInterval: 1000
 };
 
@@ -29,29 +32,23 @@ let timelineState = {
 // --- Initialization Logic ---
 
 function startInitialization() {
-  console.log("[NLM Timeline] Starting Persistent Lifecycle Monitor...");
-  
-  // 1. Initial Attempt
-  checkAndInit();
+  // 1. First immediate check
+  const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
+  if (container) {
+    console.log("[Gemini Timeline] Container found immediately.");
+    initTimeline(container);
+    return;
+  }
 
-  // 2. Persistent MutationObserver (The Sentinel)
-  // Instead of disconnecting, we keep watching for significant DOM changes (like routing)
-  const sentinelObserver = new MutationObserver((mutations) => {
-    // Check if our container is still valid
-    const isContainerValid = timelineState.container && document.body.contains(timelineState.container);
-    
-    if (!isContainerValid) {
-        // Container lost! Try to find it again
-        checkAndInit();
-    } else {
-        // Container exists, but maybe we changed pages and need to re-verify UI injection
-        // Or maybe the content changed drastically
-        const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
-        if (container && container !== timelineState.container) {
-            console.log("[NLM Timeline] Container element changed (SPA navigation). Re-initializing...");
-            cleanup();
-            initTimeline(container);
-        }
+  // 2. If not found, use MutationObserver to watch body for it
+  console.log("[Gemini Timeline] Container not found. Starting DOM Sentinel...");
+  
+  const sentinelObserver = new MutationObserver((mutations, obs) => {
+    const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
+    if (container) {
+      console.log("[Gemini Timeline] Container detected by Sentinel!");
+      obs.disconnect(); // Stop watching body
+      initTimeline(container);
     }
   });
 
@@ -59,57 +56,30 @@ function startInitialization() {
     childList: true,
     subtree: true
   });
-  
-  // 3. URL Change Listener (for SPA routing)
-  let lastUrl = location.href;
-  new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      console.log("[NLM Timeline] URL changed. Triggering re-check...");
-      setTimeout(() => {
-          checkAndInit();
-      }, 500); // Wait for DOM to settle
-    }
-  }).observe(document, {subtree: true, childList: true});
-}
 
-function checkAndInit() {
-    const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
-    if (container) {
-        if (timelineState.container !== container) {
-            console.log("[NLM Timeline] New container detected.");
-            initTimeline(container);
-        }
+  // 3. Fallback timeout
+  setTimeout(() => {
+    if (!timelineState.container) {
+      console.warn("[Gemini Timeline] Timeout: Container selector never matched:", TIMELINE_CONFIG.scrollContainerSelector);
+      sentinelObserver.disconnect();
     }
-}
-
-function cleanup() {
-    if (timelineState.bar) timelineState.bar.remove();
-    if (timelineState.observer) timelineState.observer.disconnect();
-    if (timelineState.resizeObserver) timelineState.resizeObserver.disconnect();
-    timelineState.container = null;
-    timelineState.bar = null;
-    timelineState.track = null;
-    timelineState.slider = null;
-    timelineState.tooltip = null;
-    timelineState.markers = [];
+  }, 30000);
 }
 
 function initTimeline(container) {
+  // Revert to simple container check (v3.0.0.2 style)
+  // We trust the querySelector from startInitialization
+  
   if (timelineState.container === container) return;
-  
-  // Cleanup previous instance if any
-  if (timelineState.container) cleanup();
-  
   timelineState.container = container;
-  console.log("[NLM Timeline] Initializing UI...");
+
+  console.log("[Gemini Timeline] Initializing UI...");
 
   try {
     // 1. Prepare Parent Container
     const parent = container.parentElement;
     if (!parent) {
-      console.error("[NLM Timeline] Container has no parent!");
+      console.error("[Gemini Timeline] Container has no parent!");
       return;
     }
 
@@ -117,27 +87,22 @@ function initTimeline(container) {
     const parentStyle = window.getComputedStyle(parent);
     if (parentStyle.position === 'static') {
       parent.style.position = 'relative';
-      console.log("[NLM Timeline] Set parent position to relative.");
+      console.log("[Gemini Timeline] Set parent position to relative.");
     }
 
-    // 2. Inject UI into Parent
+    // 2. Inject UI into Parent (v3.0.0.2 style)
     injectTimelineUI(parent);
 
-    // 3. Adjust Layout
-    container.style.paddingRight = TIMELINE_CONFIG.paddingRight;
-    container.style.boxSizing = 'border-box';
-    console.log(`[NLM Timeline] Added padding-right: ${TIMELINE_CONFIG.paddingRight} to container.`);
-
-    // 4. Setup Observers
+    // 3. Setup Observers
     setupObservers(container);
     setupListeners(container);
 
-    // 5. Initial Render
+    // 4. Initial Render
     recalculateMarkers();
 
-    console.log("[NLM Timeline] Initialization complete.");
+    console.log("[Gemini Timeline] Initialization complete.");
   } catch (err) {
-    console.error("[NLM Timeline] Error during initialization:", err);
+    console.error("[Gemini Timeline] Error during initialization:", err);
   }
 }
 
@@ -152,7 +117,12 @@ function injectTimelineUI(targetParent) {
   // Create Bar
   const bar = document.createElement('div');
   bar.id = TIMELINE_CONFIG.barId;
-  bar.className = 'nlm-timeline-bar';
+  bar.className = 'nlm-timeline-bar gemini-timeline-bar'; // Add Gemini class
+  
+  // Revert to default absolute positioning (controlled by CSS)
+  // v3.0.0.9 used fixed/z-index, we remove that now
+  bar.style.position = ''; 
+  bar.style.zIndex = ''; 
   
   const track = document.createElement('div');
   track.className = 'nlm-timeline-track';
@@ -171,15 +141,18 @@ function injectTimelineUI(targetParent) {
   // Inject bar into parent
   targetParent.appendChild(bar);
   
-  // Inject tooltip into bar (so it positions relative to bar)
-  // Or inject into track? Absolute positioning relative to bar works best.
+  // Inject tooltip into bar
   bar.appendChild(tooltip);
 
   timelineState.bar = bar;
   timelineState.track = track;
   timelineState.slider = slider;
   timelineState.tooltip = tooltip;
-  console.log("[NLM Timeline] UI Injected into chat panel parent.");
+  console.log("[Gemini Timeline] UI Injected into parent container.");
+}
+
+function updateTimelinePosition() {
+    // No-op in v3.0.0.2 architecture (handled by CSS absolute positioning)
 }
 
 // --- Logic ---
@@ -187,7 +160,9 @@ function recalculateMarkers() {
   if (!timelineState.container || !timelineState.track) return;
 
   const userTurns = Array.from(timelineState.container.querySelectorAll(TIMELINE_CONFIG.userTurnSelector));
-  console.log(`[NLM Timeline] Found ${userTurns.length} user turns.`);
+  
+  // DIAGNOSTIC LOG
+  console.log(`[Gemini Timeline] Diagnostic: Found ${userTurns.length} user turns using selector: ${TIMELINE_CONFIG.userTurnSelector}`);
 
   // Clear existing dots
   const existingDots = timelineState.track.querySelectorAll('.nlm-timeline-dot');
@@ -197,6 +172,7 @@ function recalculateMarkers() {
 
   if (userTurns.length === 0) {
     timelineState.bar.style.display = 'none';
+    console.log("[Gemini Timeline] Hiding bar (0 turns)");
     return;
   } else {
     timelineState.bar.style.display = 'flex';
@@ -211,14 +187,21 @@ function recalculateMarkers() {
     return;
   }
 
-  const containerRect = timelineState.container.getBoundingClientRect();
-
+  // Gemini's container might have offsets
+  // We use relative calculation based on scrollHeight
+  
   userTurns.forEach((turn, index) => {
-    const rect = turn.getBoundingClientRect();
-    const offsetFromTop = scrollTop + (rect.top - containerRect.top);
-    
+    // In Gemini, we might need to be careful about offsets.
+    // Using offsetTop relative to container is safer than getBoundingClientRect for non-visible elements
+    let offsetTop = turn.offsetTop;
+    let current = turn.offsetParent;
+    while(current && current !== timelineState.container) {
+        offsetTop += current.offsetTop;
+        current = current.offsetParent;
+    }
+
     // Normalize (0 to 1)
-    let n = offsetFromTop / totalHeight;
+    let n = offsetTop / totalHeight;
     n = Math.max(0, Math.min(1, n));
 
     // Extract Text
@@ -236,7 +219,6 @@ function recalculateMarkers() {
     const dot = document.createElement('div');
     dot.className = 'nlm-timeline-dot';
     dot.style.setProperty('--n', n);
-    // dot.title = tooltipText; // Removed native title in favor of custom tooltip
     
     // Hover Events for Tooltip
     dot.addEventListener('mouseenter', () => showTooltip(tooltipText, n));
@@ -245,9 +227,9 @@ function recalculateMarkers() {
     // Click to scroll
     dot.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log(`[NLM Timeline] Scrolling to Question ${index + 1}`);
+      console.log(`[Gemini Timeline] Scrolling to Question ${index + 1}`);
       timelineState.container.scrollTo({
-        top: offsetFromTop - 20, 
+        top: offsetTop - 100, // Add some offset for header
         behavior: 'smooth'
       });
     });
@@ -256,7 +238,7 @@ function recalculateMarkers() {
     
     timelineState.markers.push({
       element: turn,
-      top: offsetFromTop,
+      top: offsetTop,
       n: n,
       dot: dot
     });
@@ -269,9 +251,6 @@ function showTooltip(text, n) {
     if (!timelineState.tooltip) return;
     
     timelineState.tooltip.textContent = text;
-    // Position tooltip vertically aligned with the dot
-    // Dot top is calc(12px + (100% - 24px) * n)
-    // We can use the same calc or just set top style
     timelineState.tooltip.style.top = `calc(12px + (100% - 24px) * ${n})`;
     
     timelineState.tooltip.classList.add('visible');
@@ -309,18 +288,17 @@ function setupListeners(container) {
 }
 
 function setupObservers(container) {
-  console.log("[NLM Timeline] Setting up internal observers...");
+  console.log("[Gemini Timeline] Setting up internal observers...");
   
   // Mutation Observer for content changes
   timelineState.observer = new MutationObserver((mutations) => {
     const hasRelevantChange = mutations.some(m => 
-      m.addedNodes.length > 0 || 
-      (m.target && m.target.classList && m.target.classList.contains('from-user-container'))
+      m.addedNodes.length > 0
     );
 
     if (hasRelevantChange) {
       if (timelineState.debounceTimer) clearTimeout(timelineState.debounceTimer);
-      timelineState.debounceTimer = setTimeout(recalculateMarkers, 300);
+      timelineState.debounceTimer = setTimeout(recalculateMarkers, 500); // Increased debounce for Gemini
     }
   });
 

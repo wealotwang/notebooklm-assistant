@@ -204,15 +204,78 @@
 
   /* 确保 Gemini 页面上的 z-index 足够高 */
 .nlm-folder-container.gemini-folder-container {
-    z-index: 900; /* Adjust based on Gemini's layout */
-    margin-bottom: 12px;
+    z-index: 900;
+    margin-bottom: 16px; /* Space between folders and chat history */
+    margin-top: 8px;     /* Space from Gems */
+    padding: 0 12px;     /* Match Gemini sidebar padding */
 }
 
 /* Gemini Sidebar Tweaks */
 .gemini-folder-container .nlm-folder-header {
     font-size: 13px;
     font-weight: 500;
-    color: #444746; /* Gemini Sidebar Text Color */
+    color: #444746; 
+    margin-bottom: 8px;
+}
+
+/* Dark Mode Support for Gemini */
+body.dark-theme .gemini-folder-container .nlm-folder-header,
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-header {
+    color: #e3e3e3;
+}
+
+body.dark-theme .gemini-folder-container .nlm-folder-item,
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item {
+    color: #e3e3e3;
+    background-color: transparent;
+}
+
+body.dark-theme .gemini-folder-container .nlm-folder-item:hover,
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-theme .gemini-folder-container .nlm-folder-item.active,
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item.active {
+    background-color: #004a77; /* Darker blue for active state */
+    color: #a8c7fa;
+}
+
+/* Dark Mode Modal */
+body.dark-theme .nlm-modal,
+body[data-theme="dark"] .nlm-modal {
+    background-color: #1e1f20;
+    color: #e3e3e3;
+    border: 1px solid #444746;
+}
+
+body.dark-theme .nlm-modal-title,
+body[data-theme="dark"] .nlm-modal-title {
+    color: #e3e3e3;
+}
+
+body.dark-theme .nlm-folder-checkbox-item:hover,
+body[data-theme="dark"] .nlm-folder-checkbox-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Dark Mode Timeline */
+body.dark-theme .nlm-timeline-tooltip,
+body[data-theme="dark"] .nlm-timeline-tooltip {
+    background-color: #2b2c2e;
+    color: #e3e3e3;
+    border: 1px solid #444746;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+body.dark-theme .nlm-timeline-dot,
+body[data-theme="dark"] .nlm-timeline-dot {
+    border-right-color: #a8c7fa; /* Light blue dots */
+}
+
+body.dark-theme .nlm-timeline-dot:hover,
+body[data-theme="dark"] .nlm-timeline-dot:hover {
+    border-right-color: #fff;
 }
 
 /* Red Debug Box */
@@ -547,5 +610,20 @@
 .nlm-timeline-tooltip.visible {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
+}
+
+/* Gemini Timeline Specifics */
+.gemini-timeline-bar {
+    right: 16px; /* Adjust based on Gemini scrollbar */
+    z-index: 990;
+    /* Ensure it sits on top of Gemini content */
+}
+
+/* Adjust timeline tooltip for Gemini's dark mode if needed */
+body.dark-theme .nlm-timeline-tooltip,
+body[data-theme="dark"] .nlm-timeline-tooltip {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
 }
 

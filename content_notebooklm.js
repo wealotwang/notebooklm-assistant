@@ -214,6 +214,18 @@ function startObserver() {
         if (!state.renderTagsTimer) {
             state.renderTagsTimer = setTimeout(() => {
                 renderFileTags();
+                
+                // Sync Detail View if open (Refresh list to remove deleted sources)
+                if (state.activeFolderId !== 'all') {
+                     const currentFolder = state.folders.find(f => f.id === state.activeFolderId);
+                     if (currentFolder) {
+                         // 保存当前的滚动位置或选中状态？
+                         // 由于 showDetailView 会重建 DOM，可能会丢失状态。
+                         // 但这是为了同步删除，优先级更高。
+                         showDetailView(currentFolder);
+                     }
+                }
+                
                 state.renderTagsTimer = null;
             }, 100);
         }
@@ -496,7 +508,7 @@ function renderFolders() {
         removeBtnHtml = `<span class="nlm-folder-remove" title="删除文件夹">×</span>`;
     }
 
-    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span>${folder.name}</span>${removeBtnHtml}`;
+    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span class="nlm-folder-name" title="${folder.id !== 'all' ? '双击重命名' : ''}">${folder.name}</span>${removeBtnHtml}`;
     
     // 绑定删除按钮事件
     const removeBtn = li.querySelector('.nlm-folder-remove');
@@ -506,6 +518,58 @@ function renderFolders() {
             if (confirm(`确定要删除文件夹 "${folder.name}" 吗？\n文件夹内的文件将移至"全部"。`)) {
                 deleteFolder(folder.id);
             }
+        });
+    }
+
+    // 重命名功能 (双击)
+    const nameSpan = li.querySelector('.nlm-folder-name');
+    if (nameSpan && folder.id !== 'all') {
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            e.preventDefault(); // 防止选中文本
+            
+            const currentName = folder.name;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'nlm-rename-input';
+            input.style.width = 'calc(100% - 30px)';
+            input.style.border = '1px solid #1a73e8';
+            input.style.borderRadius = '4px';
+            input.style.padding = '2px 4px';
+            input.style.fontSize = 'inherit';
+            input.style.fontFamily = 'inherit';
+            
+            // 替换 span 为 input
+            nameSpan.replaceWith(input);
+            input.focus();
+            input.select();
+            
+            const saveName = () => {
+                const newName = input.value.trim();
+                if (newName && newName !== currentName) {
+                    folder.name = newName;
+                    saveData();
+                    // 如果当前正好在看这个文件夹，刷新详情头
+                    if (state.activeFolderId === folder.id) {
+                        showDetailView(folder);
+                    }
+                }
+                renderFolders(); // 无论是否保存，都重新渲染以恢复 UI
+            };
+            
+            // 绑定保存事件
+            input.addEventListener('blur', saveName);
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') {
+                    input.blur(); // 触发 saveName
+                }
+                if (ev.key === 'Escape') {
+                    renderFolders(); // 取消
+                }
+            });
+            
+            input.addEventListener('click', (ev) => ev.stopPropagation());
         });
     }
     
@@ -835,14 +899,24 @@ function safeClick(element) {
  // --- 详情视图 (独立 List) ---
  function showDetailView(folder) {
    const view = document.getElementById('nlm-detail-view');
-   view.style.display = 'block';
-   
-   // 找出属于该文件夹的文件
-   const filesInFolder = Object.keys(state.fileMappings).filter(fileName => 
-     state.fileMappings[fileName].includes(folder.id)
-   );
- 
-   view.innerHTML = `
+  view.style.display = 'block';
+  
+  // Sync: 获取当前页面上存在的文件名集合，用于过滤已删除的文件
+  // 这解决了"Source被删，文件夹里没同步"的问题（视觉同步）
+  const allSourceRows = getAllSourceRows();
+  const availableFileNames = new Set();
+  allSourceRows.forEach(row => {
+      const name = extractFileNameFromRow(row);
+      if (name) availableFileNames.add(normalizeFileName(name));
+  });
+  
+  // 找出属于该文件夹的文件，并过滤掉已删除的
+  const filesInFolder = Object.keys(state.fileMappings).filter(fileName => 
+    state.fileMappings[fileName].includes(folder.id) && 
+    availableFileNames.has(normalizeFileName(fileName))
+  );
+
+  view.innerHTML = `
      <div class="nlm-detail-header">
        <span style="font-weight:bold; font-size:16px;">${folder.name} (${filesInFolder.length})</span>
        <div class="nlm-detail-actions" style="display:flex; align-items:center;">

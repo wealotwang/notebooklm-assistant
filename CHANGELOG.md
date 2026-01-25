@@ -1,5 +1,54 @@
 # Changelog
 
+## [3.0.0.10] - 2026-01-24
+### Fixed
+- **Gemini Timeline Revert**: 鉴于 v3.0.0.9 的 Body 注入方案在用户环境中失效，我们决定彻底回滚到 **v3.0.0.2** 的经典架构。
+  - **Parent Injection**: 恢复将 Timeline 注入到 `infinite-scroller` 的父容器中（使用 `position: absolute`），而不是 Body。
+  - **Logic Reset**: 移除了所有复杂的选择器纠错和动态定位逻辑，回归最纯粹的 DOM 注入。
+  - **Diagnostics**: 增加了关键的调试日志 (`[Gemini Timeline] Diagnostic: ...`)，如果 Timeline 依然不显示，我们可以通过控制台明确知道是选择器没找到元素，还是 UI 被隐藏了。
+
+## [3.0.0.9] - 2026-01-24
+### Fixed
+- **Gemini Timeline Visibility**: 采用了类似 Voyager 的 **Body 注入 + 绝对定位** 策略。
+  - **Reparenting**: 将 Timeline UI 直接挂载到 `document.body`，彻底规避了 `infinite-scroller` 父容器可能存在的 `overflow: hidden` 裁剪或层叠上下文遮挡问题。
+  - **Dynamic Positioning**: 实现了 `updateTimelinePosition` 逻辑，实时计算滚动容器的 `BoundingClientRect`，让悬浮的 Timeline 视觉上完美吸附在右侧滚动条区域。
+  - **Interaction Preservation**: 完整保留了三角形锚点和 50 字气泡预览等核心交互体验。
+
+## [3.0.0.8] - 2026-01-24
+### Fixed
+- **Gemini Timeline**: 鉴于单文件合并方案的不稳定，已**完全回滚**至 v3.0.0.3 的双文件架构 (`content_gemini.js` + `timeline_gemini.js`)。
+  - **Revert**: 恢复了独立的 `timeline_gemini.js` 文件，确保时间轴逻辑与侧边栏逻辑解耦。
+  - **Initialization**: 采用了 v3.0.0.2/3 时代的简单初始化逻辑，但保留了后续版本中对 `infinite-scroller` 选择器的精准修正。
+
+## [3.0.0.7] - 2026-01-24
+### Fixed
+- **Gemini Timeline**: 彻底回归 v3.0.0.2 的极简初始化逻辑，移除了所有复杂的 SPA 路由监听和 MutationObserver 哨兵机制，仅保留基础的 DOM 注入。
+- **Selector Config**: 恢复了 v3.0.0.2 的宽泛选择器配置 (`infinite-scroller, #chat-history-scroll-container`)，但增加了对父容器匹配的智能纠错逻辑（如果匹配到父级 wrapper，自动向下查找 `infinite-scroller`），确保滚动监听的准确性。
+
+## [3.0.0.6] - 2026-01-24
+### Fixed
+- **Timeline Rollback & Fix**: 回滚了时间轴的架构至 v3.0.0.2 的简化版本，但保留了 v3.0.0.5 中精准的 `<infinite-scroller>` 选择器。
+  - **Inline Integration**: 将 `timeline_gemini.js` 逻辑合并回 `content_gemini.js`，消除了脚本加载失败的风险。
+  - **Stability**: 移除了复杂的 SPA 路由监听，回归最纯粹的 `MutationObserver` 注入逻辑，确保功能立即可用。
+
+## [3.0.0.5] - 2026-01-24
+### Fixed
+- **Gemini Timeline**: 修正了时间轴滚动容器的选择器逻辑。
+  - **Selector Precision**: 现在优先匹配 `<infinite-scroller>` 元素，解决了之前误匹配到父级非滚动容器 (`#chat-history-scroll-container`) 导致滚动监听失效的问题。
+  - **Fallback Logic**: 增加了智能回退查找逻辑，如果直接匹配失败，会尝试从父容器向下查找，确保 100% 命中真正的滚动视图。
+
+## [3.0.0.4] - 2026-01-24
+### Fixed
+- **Timeline Stability**: 彻底重构了时间轴的初始化逻辑，引入了“持久化生命周期监控”机制。
+  - **SPA Support**: 新增了 URL 变化监听和路由导航检测，确保在 Gemini/NotebookLM 切换对话时，时间轴能自动重新绑定到新的滚动容器。
+  - **Self-Healing**: 当检测到 DOM 容器被销毁或替换时，会自动触发清理和重新注入，解决了“滚动条偶尔失效”或“需要刷新才显示”的问题。
+
+## [3.0.0.3] - 2026-01-24
+### Fixed
+- **Gemini ID Capture**: 重构了 `setupGlobalClickListener`，不再依赖点击事件冒泡，而是通过 DOM 遍历精准查找被点击按钮所属的对话链接，解决了“无法获取对话信息”的错误。
+- **UI Positioning**: 修正了文件夹容器的插入逻辑，确保其位于 Gems 列表和 Chat History 之间，并增加了正确的边距。
+- **Dark Mode**: 全面适配了 Gemini 的深色模式，文件夹列表、模态框和时间轴在 Dark Mode 下现在拥有正确的背景色和文字对比度。
+
 ## [3.0.0.2] - 2026-01-24
 ### Gemini Integration (Alpha)
 - **Injection Robustness**: 增强了 Gemini 侧边栏的注入逻辑，增加了多种选择器策略和轮询兜底机制，确保在不同版本的 Gemini 界面上都能正确加载。

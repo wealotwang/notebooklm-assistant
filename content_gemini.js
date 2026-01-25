@@ -101,77 +101,64 @@ function startObserver() {
 }
 
 function findSidebarNav() {
-    // 1. Try Voyager's selector
-    const recentChats = document.querySelector('expandable-list-item, [data-test-id="recent-chats-list"]');
-    if (recentChats) {
-        DOMService.log("Found sidebar via 'recent-chats-list'");
-        return recentChats.parentElement; 
-    }
-    
-    // 2. Try generic 'nav' in sidebar
-    // Gemini sidebar is often in a <mat-sidenav> or similar
-    const sideNav = document.querySelector('mat-sidenav-content .nav-content, mat-sidenav .nav-content');
-    if (sideNav) {
-        DOMService.log("Found sidebar via 'mat-sidenav'");
-        return sideNav;
-    }
-    
-    // 3. Try finding the "New Chat" button and go up
-    const newChatBtn = document.querySelector('a[href^="/app"][aria-label="New chat"], button[aria-label="New chat"]');
-    if (newChatBtn) {
-        // Usually the list is below this button
-        // We want the container that holds the list
-        // Go up until we find a scrollable container or the sidebar root
-        let current = newChatBtn.parentElement;
-        for (let i = 0; i < 5; i++) {
-            if (!current) break;
-            if (current.querySelector('expandable-list-item')) {
-                 DOMService.log("Found sidebar via 'New chat' button traversal");
-                 return current;
-            }
-            current = current.parentElement;
-        }
-    }
+     // 1. Target the .chat-history container specifically (based on user screenshot)
+     // This is the container for the chat list, we want to insert BEFORE it.
+     const chatHistory = document.querySelector('.chat-history, [data-test-id="chat-history-list"]');
+     if (chatHistory) {
+         DOMService.log("Found sidebar via '.chat-history'");
+         return chatHistory; // Return the element itself, not parent
+     }
+     
+     // 2. Try Voyager's selector as fallback
+     const recentChats = document.querySelector('expandable-list-item, [data-test-id="recent-chats-list"]');
+     if (recentChats) {
+         DOMService.log("Found sidebar via 'recent-chats-list' (Fallback)");
+         return recentChats.parentElement; 
+     }
+     
+     return null;
+ }
 
-    return null;
-}
-
-// --- Sidebar UI ---
-function injectFolderUI(targetContainer) {
-  if (document.querySelector('.nlm-folder-container')) return;
-  
-  DOMService.log("Injecting Folder UI into Gemini Sidebar...");
-
-  const container = document.createElement('div');
-  container.className = 'nlm-folder-container gemini-folder-container'; // Add gemini specific class
-  
-  // Reuse existing styles structure
-  container.innerHTML = `
-    <div class="nlm-folder-header">
-      <span>文件夹分类</span>
-      <div class="nlm-header-actions">
-        <button class="nlm-add-btn" title="新建文件夹">+</button>
-      </div>
-    </div>
-    <ul class="nlm-folder-list" id="gemini-folder-list"></ul>
-  `;
-  
-  // Insert at the top of the container
-  targetContainer.insertBefore(container, targetContainer.firstChild);
-  
-  // Bind Events
-  container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const name = prompt("新建文件夹名称:");
-    if (name) {
-      state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
-      saveData();
-      renderFolders();
-    }
-  });
-  
-  renderFolders();
-}
+ // --- Sidebar UI ---
+ function injectFolderUI(targetElement) {
+   if (document.querySelector('.nlm-folder-container')) return;
+   
+   DOMService.log("Injecting Folder UI into Gemini Sidebar...");
+ 
+   const container = document.createElement('div');
+   container.className = 'nlm-folder-container gemini-folder-container'; // Add gemini specific class
+   
+   // Reuse existing styles structure
+   container.innerHTML = `
+     <div class="nlm-folder-header">
+       <span>文件夹分类</span>
+       <div class="nlm-header-actions">
+         <button class="nlm-add-btn" title="新建文件夹">+</button>
+       </div>
+     </div>
+     <ul class="nlm-folder-list" id="gemini-folder-list"></ul>
+   `;
+   
+   // Insert BEFORE the target element (which is likely .chat-history)
+   if (targetElement.parentElement) {
+       targetElement.parentElement.insertBefore(container, targetElement);
+   } else {
+       console.error("Target element has no parent, cannot insert.");
+   }
+   
+   // Bind Events
+   container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
+     e.stopPropagation();
+     const name = prompt("新建文件夹名称:");
+     if (name) {
+       state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
+       saveData();
+       renderFolders();
+     }
+   });
+   
+   renderFolders();
+ }
 
 // --- Debugging ---
 const DOMService = {
@@ -271,25 +258,61 @@ function deleteFolder(folderId) {
 function setupGlobalClickListener() {
   document.addEventListener('mousedown', (e) => {
     // Look for the "Three Dots" button in Gemini sidebar
-    // It usually has a specific icon or aria-label
-    // Strategy: Look for closest button within a chat item
-    const chatItem = e.target.closest('a[href^="/app/"]'); // Chat items are links
-    const moreBtn = e.target.closest('button');
+    // Strategy: 
+    // 1. Check if we clicked a button
+    // 2. If it's the menu trigger, it usually is inside the chat item container
+    // 3. The chat item container usually has the <a href="..."> link
     
-    if (chatItem && moreBtn) {
-        // User clicked a button INSIDE a chat item (likely the 3-dots)
-        // Extract ID from href
-        const href = chatItem.getAttribute('href');
-        // href format: /app/12345678 or /app/hash
-        const id = href.split('/').pop();
-        // Extract Title
-        const titleEl = chatItem.querySelector('.conversation-title, .title'); // Adjust selector
-        const title = titleEl ? titleEl.textContent.trim() : 'Unknown Chat';
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    // Check if this button is likely the "More options" button
+    // It might have an aria-label or specific icon
+    // But generic traversal is safer: look for a sibling or parent <a> tag
+    
+    // Go up to find the list item container
+    // In Gemini, it's usually <div class="conversation-container"> or similar
+    // Or just go up 3-4 levels and look for 'a' tag
+    let container = btn.parentElement;
+    let link = null;
+    
+    for (let i = 0; i < 5; i++) {
+        if (!container) break;
+        // Look for the link in this container
+        link = container.querySelector('a[href^="/app/"]');
+        if (link) break;
         
-        state.currentMenuContext = { id, title };
-        console.log("Gemini Context Captured:", state.currentMenuContext);
+        // Also check if the container ITSELF is the link (rare but possible)
+        if (container.tagName === 'A' && container.getAttribute('href').startsWith('/app/')) {
+            link = container;
+            break;
+        }
+        
+        container = container.parentElement;
     }
-  }, true);
+    
+    if (link) {
+        const href = link.getAttribute('href');
+        const id = href.split('/').pop();
+        
+        // Try to find title
+        let title = 'Untitled Chat';
+        const titleEl = link.querySelector('.conversation-title, .title, .label');
+        if (titleEl) title = titleEl.textContent.trim();
+        else {
+             // Fallback: try to find any text node
+             title = link.textContent.trim().substring(0, 20) + '...';
+        }
+
+        state.currentMenuContext = { id, title };
+        DOMService.log(`Context Captured: ${id} - ${title}`);
+    } else {
+        // Only log warning if we are sure it was a menu trigger (heuristic)
+        if (btn.querySelector('mat-icon') || btn.innerHTML.includes('more_vert')) {
+             DOMService.log("Clicked menu button but could not find Conversation Link!");
+        }
+    }
+  }, true); // Capture phase
 }
 
 // 2. Inject Menu Item
