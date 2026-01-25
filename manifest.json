@@ -1,13 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "NotebookLM Folder Manager",
-  "version": "2.1.26",
-  "description": "Add folder organization to NotebookLM sources.",
+  "name": "Google AI Companion",
+  "version": "3.0.0.2",
+  "description": "Enhance your Google AI experience (NotebookLM & Gemini) with Folders, Timelines, and more.",
   "permissions": ["storage"],
+  "host_permissions": [
+    "https://notebooklm.google.com/*",
+    "https://gemini.google.com/*"
+  ],
   "content_scripts": [
     {
       "matches": ["https://notebooklm.google.com/*"],
-      "js": ["content.js", "timeline.js"],
+      "js": ["content_notebooklm.js", "timeline.js"],
+      "css": ["styles.css"]
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://gemini.google.com/app/*"
+      ],
+      "js": ["content_gemini.js"],
       "css": ["styles.css"]
     }
   ],

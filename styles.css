@@ -202,7 +202,21 @@
       background-color: rgba(0, 0, 0, 0.04); /* 轻微高亮，提示可点击 */
   }
 
-  /* 批量操作工具栏 */
+  /* 确保 Gemini 页面上的 z-index 足够高 */
+.nlm-folder-container.gemini-folder-container {
+    z-index: 900; /* Adjust based on Gemini's layout */
+    margin-bottom: 12px;
+}
+
+/* Gemini Sidebar Tweaks */
+.gemini-folder-container .nlm-folder-header {
+    font-size: 13px;
+    font-weight: 500;
+    color: #444746; /* Gemini Sidebar Text Color */
+}
+
+/* Red Debug Box */
+/* (Inline style used in JS, no CSS needed) */
   .nlm-batch-toolbar {
     position: fixed;
     bottom: 24px;

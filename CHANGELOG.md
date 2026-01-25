@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.0.2] - 2026-01-24
+### Gemini Integration (Alpha)
+- **Injection Robustness**: 增强了 Gemini 侧边栏的注入逻辑，增加了多种选择器策略和轮询兜底机制，确保在不同版本的 Gemini 界面上都能正确加载。
+- **Debugging**: 移植了 `DOMService` 到 Gemini 模块，并添加了可视化的连接状态指示器（右上角红框），方便排查加载问题。
+- **Manifest**: 修复了 Gemini App 路由 (`/app/*`) 的匹配规则，确保插件在深层链接中也能生效。
+
+## [3.0.0] - 2026-01-24
+### Changed
+- **Rebranding**: 项目更名为 **Google AI Companion**。
+- **Architecture**: 代码库重构，支持多平台架构。
+  - `content.js` 重命名为 `content_notebooklm.js`。
+  - 新增 `content_gemini.js` 用于未来的 Gemini 支持。
+- **Manifest**: 更新权限和匹配规则，支持 `gemini.google.com`。
+
 ## [2.1.26] - 2026-01-24
 ### Improved
 - **UX**: 移除了文件归类成功后的 Alert 弹窗提示，操作更加流畅无打扰。
