@@ -47,6 +47,26 @@
 *   **注入攻坚**: 针对 Gemini 复杂的 SPA 结构，实现了多策略注入机制（轮询 + 多种选择器兜底），并引入了可视化的“红框诊断”工具。
 *   **功能复刻**: 成功将 NotebookLM 的核心功能（文件夹管理、时间轴导航）移植到 Gemini 平台。
 
+### 🟡 NotebookLM 体验完善 (v3.0.0.11 - v3.0.0.15)
+**Date:** 2026-01-25
+**Context:** 在完善 Gemini 功能的同时，我们也对 NotebookLM 的核心体验进行了最后一公里的打磨，重点解决了全选频闪、重命名不便和“幽灵文件”三大痛点。
+
+#### 1. 全选频闪与死循环 (Infinite Sync Loop)
+*   **问题**: 用户反馈点击“全选”时，Checkbox 会疯狂闪烁。
+*   **根源**: 我们的 `MutationObserver` 和 `change` 事件监听器过于“勤奋”。
+    *   **Round 1 (Observer)**: 监听 `attributes` 变化，导致“插件修改 -> 触发 Observer -> 再次修改”的死循环。
+    *   **Round 2 (Event)**: 切换到 `change` 事件后，发现插件代码调用 `element.click()` 也会触发原生 `change` 事件，再次陷入死循环。
+*   **解决 (Event Gating)**: 引入了 **事件门控 (Event Gating)** 机制。使用 `isProgrammaticClick` 标志位，在插件执行操作期间暂时屏蔽监听器，彻底切断了反馈回路。
+
+#### 2. 幽灵文件与性能优化 (Ghost Files)
+*   **问题**: 删除源文件后，文件夹视图中依然残留该文件；且全选时性能不佳。
+*   **根源**: `MutationObserver` 的触发条件过于宽泛（`hasRows`），导致任何微小变动都触发全量重绘。
+*   **解决**: 重构了 Observer 逻辑，实施 **按需更新**。只有检测到 `removedNodes` 中包含源文件行时，才触发 Detail View 的刷新。这既解决了同步问题，又大幅提升了性能。
+
+#### 3. 交互增强
+*   **重命名**: 在文件夹右键菜单中增加了“重命名”选项，与双击重命名共享逻辑，提供了更明显的入口。
+*   **Gemini 视觉**: 实现了侧边栏的磨砂透明效果，并采用了“Gems-First”插入策略，确保 UI 稳固地位于 Gems 和 Chats 之间。
+
 ---
 
 ## 🛠 Phase 2: NotebookLM 深度优化 (Refinement)

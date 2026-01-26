@@ -1,65 +1,68 @@
 /* ...保留之前的样式... */
 /* 文件夹容器 */
 .nlm-folder-container {
-    padding: 8px 16px;
-    border-bottom: 1px solid #dadce0;
-    background-color: #fff;
-    font-family: 'Google Sans', Roboto, Arial, sans-serif;
-    margin-bottom: 8px; /* 与下方隔开一点 */
-    position: relative; /* 为定位做准备 */
-  }
-  
-  /* 标题行 */
-  .nlm-folder-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    color: #5f6368;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .nlm-header-actions {
-    display: flex;
-    gap: 8px;
-  }
+  padding: 8px 16px;
+  /* border-bottom: 1px solid #dadce0; Removed for transparency */
+  background-color: transparent; /* Transparent background */
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  margin-bottom: 8px; /* 与下方隔开一点 */
+  position: relative; /* 为定位做准备 */
+}
 
-  /* 文件夹列表 */
-  .nlm-folder-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  /* 单个文件夹胶囊样式 */
-  .nlm-folder-item {
-    display: flex;
-    align-items: center;
-    padding: 6px 12px;
-    border: 1px solid #dadce0;
-    border-radius: 16px;
-    cursor: pointer;
-    background-color: #fff;
-    transition: all 0.2s ease;
-    color: #3c4043;
-    font-size: 14px;
-    user-select: none;
-  }
-  
-  .nlm-folder-item:hover {
-    background-color: #f1f3f4;
-    border-color: #dadce0;
-  }
-  
-  /* 选中状态 */
+/* 标题行 */
+.nlm-folder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #5f6368;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nlm-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 文件夹列表 */
+.nlm-folder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* 单个文件夹胶囊样式 */
+.nlm-folder-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid rgba(218, 220, 224, 0.5); /* Lighter border */
+  border-radius: 16px;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.6); /* Semi-transparent white */
+  backdrop-filter: blur(4px); /* Frost effect */
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+  color: #3c4043;
+  font-size: 14px;
+  user-select: none;
+}
+
+.nlm-folder-item:hover {
+  background-color: rgba(255, 255, 255, 0.9); /* More opaque on hover */
+  border-color: #dadce0;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.1);
+}
+
+/* 选中状态 */
 .nlm-folder-item.active {
-  background-color: #e8f0fe;
+  background-color: #e8f0fe; /* Keep solid for active state readability */
   color: #1967d2;
   border-color: #e8f0fe;
   padding-right: 8px; /* Reduce padding to accommodate close button */

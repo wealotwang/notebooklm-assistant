@@ -101,15 +101,36 @@ function startObserver() {
 }
 
 function findSidebarNav() {
-     // 1. Target the .chat-history container specifically (based on user screenshot)
+     // Strategy 1: "Gems-First" approach (User requested: insert between Gems and Chats)
+     // Try to find the Gems list container
+     const gemsList = document.querySelector('.gems-list-container, [data-test-id="gems-list"]');
+     if (gemsList) {
+         DOMService.log("Found sidebar via 'gems-list-container'");
+         // We want to insert AFTER the Gems list.
+         // But since insertBefore is the standard API, we look for the element AFTER Gems.
+         // In Gemini DOM, there are often comment nodes (<!---->) after Gems.
+         // We should insert before the next visible element (like Chat History) or just append after Gems.
+         // A safe bet is to return the Gems list, and let injectFolderUI handle "insertAfter" logic,
+         // OR return the Chat History and rely on "insertBefore".
+         
+         // However, the user specifically mentioned "between Gems and Chats".
+         // The previous implementation inserted BEFORE Chat History.
+         // If we want to be "between", and there are comment nodes, 
+         // inserting BEFORE Chat History puts us AFTER the comment nodes (usually).
+         // Unless the comment nodes are inside the Chat History container? No, they are siblings.
+         
+         // Let's look for Chat History again, but this time check its siblings.
+     }
+
+     // Strategy 2: Target the .chat-history container specifically
      // This is the container for the chat list, we want to insert BEFORE it.
      const chatHistory = document.querySelector('.chat-history, [data-test-id="chat-history-list"]');
      if (chatHistory) {
          DOMService.log("Found sidebar via '.chat-history'");
-         return chatHistory; // Return the element itself, not parent
+         return chatHistory; 
      }
      
-     // 2. Try Voyager's selector as fallback
+     // 3. Try Voyager's selector as fallback
      const recentChats = document.querySelector('expandable-list-item, [data-test-id="recent-chats-list"]');
      if (recentChats) {
          DOMService.log("Found sidebar via 'recent-chats-list' (Fallback)");
@@ -139,9 +160,48 @@ function findSidebarNav() {
      <ul class="nlm-folder-list" id="gemini-folder-list"></ul>
    `;
    
-   // Insert BEFORE the target element (which is likely .chat-history)
-   if (targetElement.parentElement) {
-       targetElement.parentElement.insertBefore(container, targetElement);
+   // Insertion Logic Refined for "Between Gems and Chats"
+   // targetElement is currently '.chat-history' (Strategy 2) or parent of recent chats (Strategy 3)
+   
+   if (targetElement && targetElement.parentElement) {
+       // Check if we can find a better anchor point (e.g., Gems list)
+       const gemsList = targetElement.parentElement.querySelector('.gems-list-container');
+       
+       if (gemsList) {
+           // If Gems list exists, we try to insert AFTER it.
+           // The safest way to "insert after" is to insertBefore the next sibling of Gems.
+           // But if Gems and Chat History are separated by comments, we want to be careful.
+           
+           // User's observation: "Insert between Gems and Chats (between the exclamation marks)"
+           // Simply inserting before Chat History usually achieves this visually.
+           // But if the previous logic failed (was "sticking out"), maybe we were too close?
+           // Let's try to insert specifically before the targetElement (Chat History).
+           // This is what we were doing.
+           
+           // Maybe the user wants it ABOVE the "Chats" header?
+           // Does ".chat-history" include the header? usually no.
+           // Let's look for a header sibling.
+           
+           // Heuristic: If targetElement (Chat History) has a previous sibling that is NOT Gems list,
+           // maybe it's the "Chats" header or a divider.
+           // Let's just insert before targetElement for now, but ensure we handle margin in CSS.
+           
+           // WAIT: User said "Gems List" -> "Comment" -> "Comment" -> "Folder" -> "Chat History"
+           // The user wants: "Gems" -> "Folder" -> "Chats".
+           // If we insertBefore(gemsList.nextSibling), we are immediately after Gems.
+           
+           if (gemsList.nextSibling) {
+               targetElement.parentElement.insertBefore(container, gemsList.nextSibling);
+               DOMService.log("Inserted AFTER Gems List");
+           } else {
+               targetElement.parentElement.appendChild(container); // Gems is last?
+               DOMService.log("Appended AFTER Gems List");
+           }
+       } else {
+           // Fallback: Insert before Chat History
+           targetElement.parentElement.insertBefore(container, targetElement);
+           DOMService.log("Inserted BEFORE Chat History (Fallback)");
+       }
    } else {
        console.error("Target element has no parent, cannot insert.");
    }

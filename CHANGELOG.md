@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.0.0.15] - 2026-01-25
+### Fixed
+- **NotebookLM Observer Optimization**: 解决了全选时的视觉频闪和性能问题。
+  - **Refactor**: 重构了 `MutationObserver` 逻辑，移除了 `hasRows` 导致的无条件更新。现在，Detail View 的刷新仅在检测到 **源文件被删除 (removedNodes)** 时触发，这既保留了“防止幽灵文件”的功能，又彻底避免了因 Ripple 动画或 Class 变化导致的无限重绘。
+
+## [3.0.0.14] - 2026-01-25
+### Fixed
+- **NotebookLM Infinite Sync Loop**: 彻底修复了全选频闪问题。
+  - **Root Cause**: 原生的 `change` 事件不仅由用户触发，也会被插件的代码点击 (`element.click()`) 触发，导致了“插件同步 -> 触发原生事件 -> 插件捕获事件 -> 再次同步”的死循环。
+  - **Fix**: 引入了 **Event Gating (事件门控)** 机制。使用 `state.isProgrammaticClick` 标志位，在插件执行点击操作期间，暂时屏蔽对 `change` 事件的响应，只允许用户真实的交互触发同步。
+
+## [3.0.0.13] - 2026-01-25
+### Fixed
+- **NotebookLM Checkbox Flickering**: 修复了全选操作时 Checkbox 高速频闪的问题。
+  - **Root Cause**: 之前的 `MutationObserver` 对 Checkbox 的属性变化监听过于敏感，导致插件与原生 UI 之间产生了死循环（Plugin Sync -> DOM Change -> Plugin Sync -> ...）。
+  - **Fix**: 移除了针对 Checkbox 属性的观察者逻辑，转而使用原生的 `change` 事件监听器。这种方式只响应用户的真实交互，彻底切断了反馈回路。
+
 ## [3.0.0.10] - 2026-01-24
 ### Fixed
 - **Gemini Timeline Revert**: 鉴于 v3.0.0.9 的 Body 注入方案在用户环境中失效，我们决定彻底回滚到 **v3.0.0.2** 的经典架构。

@@ -29,42 +29,50 @@ let timelineState = {
   initRetryCount: 0
 };
 
-// --- Initialization Logic ---
-
-function startInitialization() {
-  // 1. First immediate check
-  const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
-  if (container) {
-    console.log("[Gemini Timeline] Container found immediately.");
-    initTimeline(container);
-    return;
-  }
-
-  // 2. If not found, use MutationObserver to watch body for it
-  console.log("[Gemini Timeline] Container not found. Starting DOM Sentinel...");
+// --- Lifecycle Management (Persistent) ---
+const TimelineLifecycle = {
+  observer: null,
   
-  const sentinelObserver = new MutationObserver((mutations, obs) => {
+  start() {
+    console.log("[Gemini Timeline] Starting Lifecycle Manager...");
+    
+    // Watch the body for major DOM changes (navigation, re-renders)
+    this.observer = new MutationObserver(this.handleMutations.bind(this));
+    this.observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Initial check
+    this.checkAndRevive();
+  },
+  
+  handleMutations: function(mutations) {
+    // Debounce to avoid spamming checks during heavy rendering
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.checkAndRevive();
+    }, 500); // 500ms debounce
+  },
+  
+  checkAndRevive() {
+    // 1. Is the Scroll Container present?
     const container = document.querySelector(TIMELINE_CONFIG.scrollContainerSelector);
-    if (container) {
-      console.log("[Gemini Timeline] Container detected by Sentinel!");
-      obs.disconnect(); // Stop watching body
+    
+    // 2. Is our Timeline Bar present?
+    const bar = document.getElementById(TIMELINE_CONFIG.barId);
+    
+    if (container && !bar) {
+      console.log("[Gemini Timeline] Lifecycle: Container found but Timeline missing. Reviving...");
       initTimeline(container);
+    } else if (!container && bar) {
+       console.log("[Gemini Timeline] Lifecycle: Container lost. Cleaning up Timeline...");
+       // Ideally we should remove the bar, but it might be detached already.
+       // Let's just reset state.
+       timelineState.bar = null;
     }
-  });
+  }
+};
 
-  sentinelObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-
-  // 3. Fallback timeout
-  setTimeout(() => {
-    if (!timelineState.container) {
-      console.warn("[Gemini Timeline] Timeout: Container selector never matched:", TIMELINE_CONFIG.scrollContainerSelector);
-      sentinelObserver.disconnect();
-    }
-  }, 30000);
-}
+// Start everything
+TimelineLifecycle.start();
 
 function initTimeline(container) {
   // Revert to simple container check (v3.0.0.2 style)
@@ -334,5 +342,3 @@ function highlightActiveDot() {
   }
 }
 
-// Start
-startInitialization();

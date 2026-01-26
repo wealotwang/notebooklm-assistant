@@ -10,7 +10,8 @@ let state = {
   currentMenuFile: null, // 当前正在操作菜单的文件名
   isBatchMode: false,
   selectedBatchFiles: new Set(),
-  currentNotebookId: null // 当前笔记本ID
+  currentNotebookId: null, // 当前笔记本ID
+  isProgrammaticClick: false // Flag to prevent recursive sync loops
 };
 
 // --- 初始化 ---
@@ -21,8 +22,39 @@ function init() {
   loadData(() => {
     startObserver();
     setupGlobalClickListener(); // 监听全局点击以捕获菜单
+    setupNativeCheckboxListener(); // 监听原生 Checkbox 变化 (Fix Flickering)
     setupNavigationListener(); // 监听路由变化
   });
+}
+
+// --- Native Checkbox Listener (Event-Driven Sync) ---
+function setupNativeCheckboxListener() {
+  // Use 'change' event to capture user interactions with checkboxes.
+  // This avoids the infinite loop caused by MutationObserver watching attribute changes.
+  document.addEventListener('change', (e) => {
+      // 1. Gate: Ignore programmatic clicks
+      if (state.isProgrammaticClick) {
+          // DOMService.log("[Event Watch] Ignored programmatic change event.");
+          return;
+      }
+
+      const target = e.target;
+      // Check if it's a checkbox of interest
+      if (target.tagName === 'INPUT' && target.type === 'checkbox') {
+          // Ignore our own checkboxes
+          if (target.classList.contains('nlm-file-checkbox') || target.classList.contains('nlm-batch-checkbox')) return;
+          
+          DOMService.log(`[Event Watch] User Interaction detected on Checkbox:`, target);
+          
+          // Trigger sync (Debounced)
+          if (!state.syncTimer) {
+            state.syncTimer = setTimeout(() => {
+                syncViewFromNative();
+                state.syncTimer = null;
+            }, 100); // Increased debounce to 100ms
+          }
+      }
+  }, true); // Capture phase to ensure we catch it
 }
 
 // --- 路由监听 (SPA) ---
@@ -114,7 +146,7 @@ function startObserver() {
     let shouldUpdateDraggable = false;
     let shouldUpdateBatch = false;
     let shouldUpdateTags = false;
-    let shouldSyncSelection = false; // New: Sync trigger
+    let shouldRefreshDetailView = false; // New: Targeted refresh for Ghost Files
 
     mutations.forEach(mutation => {
       // 0. Ignore internal UI changes
@@ -132,34 +164,27 @@ function startObserver() {
 
       // 1. Attribute changes (Class/Aria) for Syncing
       if (mutation.type === 'attributes') {
-          const target = mutation.target;
-          
-          // Debug Logging for DOM Watch
-          if (target.tagName === 'INPUT' && target.type === 'checkbox' && !target.classList.contains('nlm-file-checkbox')) {
-               DOMService.log(`[DOM Watch] Input attribute changed: ${mutation.attributeName}`, target.className);
-               
-               // Fast Path: 针对单选框变化，立即触发点对点更新，跳过 Debounce
-               // 通过 DOM 关系找到这一行的文件名
-               const row = target.closest('.row') || target.closest('div[role="row"]');
-               if (row) {
-                   const fileName = extractFileNameFromRow(row);
-                   if (fileName) {
-                       const isCheckedNative = isChecked(target);
-                       updateViewCheckboxState(fileName, isCheckedNative);
-                   }
-               }
-               
-               shouldSyncSelection = true; // 仍然触发全量检查作为兜底
-          }
-          else if (target.tagName === 'MAT-CHECKBOX') {
-               DOMService.log(`[DOM Watch] Mat-Checkbox attribute changed: ${mutation.attributeName}`, target.className);
-               shouldSyncSelection = true;
-          }
-          return; // Skip structural checks for attribute changes
+          // REMOVED: Checkbox attribute watching caused infinite loops/flickering.
+          // We now rely on 'change' event listener in setupNativeCheckboxListener.
+          return; 
       }
 
       // 2. Structural changes (Nodes added/removed)
-      // ... existing logic ...
+      // Check for removed nodes (Ghost File Fix)
+      if (mutation.removedNodes.length > 0) {
+          Array.from(mutation.removedNodes).forEach(node => {
+              if (node.nodeType === 1) {
+                  // If a row or source container is removed, we must refresh the detail view
+                  if (node.classList.contains('row') || 
+                      node.classList.contains('single-source-container') ||
+                      node.querySelector('.row') ||
+                      node.querySelector('.single-source-container')) {
+                      shouldRefreshDetailView = true;
+                  }
+              }
+          });
+      }
+
       const isInternalChange = Array.from(mutation.addedNodes).some(node => 
         node.nodeType === 1 && (
             node.classList.contains('nlm-batch-checkbox') ||
@@ -196,33 +221,25 @@ function startObserver() {
       }
     });
 
-    if (shouldSyncSelection) {
-        // Debounce sync to avoid spamming
-        if (!state.syncTimer) {
-            state.syncTimer = setTimeout(() => {
-                syncViewFromNative();
-                state.syncTimer = null;
-            }, 50);
-        }
-    }
-
     if (shouldUpdateDraggable) makeSourcesDraggable();
     if (shouldUpdateBatch) updateBatchUI();
-    // 使用 getAllSourceRows 检查是否真的有 row，而不是依赖旧的选择器
-    const hasRows = getAllSourceRows().length > 0;
-    if (shouldUpdateTags || hasRows) {
+    
+    // Optimized Render Logic:
+    // Only render tags if specifically requested (added nodes) OR if rows are removed (might need to re-tag remaining?)
+    // Actually, tag rendering is cheap, we can do it if structural changes happen.
+    // BUT Detail View refresh is expensive and causes flickering.
+    
+    if (shouldUpdateTags || shouldRefreshDetailView) {
         if (!state.renderTagsTimer) {
             state.renderTagsTimer = setTimeout(() => {
                 renderFileTags();
                 
-                // Sync Detail View if open (Refresh list to remove deleted sources)
-                if (state.activeFolderId !== 'all') {
+                // Only refresh Detail View if explicitly requested (Row Removal)
+                if (shouldRefreshDetailView && state.activeFolderId !== 'all') {
                      const currentFolder = state.folders.find(f => f.id === state.activeFolderId);
                      if (currentFolder) {
-                         // 保存当前的滚动位置或选中状态？
-                         // 由于 showDetailView 会重建 DOM，可能会丢失状态。
-                         // 但这是为了同步删除，优先级更高。
                          showDetailView(currentFolder);
+                         DOMService.log("[Observer] Refreshed Detail View due to row removal.");
                      }
                 }
                 
@@ -526,50 +543,8 @@ function renderFolders() {
     if (nameSpan && folder.id !== 'all') {
         nameSpan.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            e.preventDefault(); // 防止选中文本
-            
-            const currentName = folder.name;
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentName;
-            input.className = 'nlm-rename-input';
-            input.style.width = 'calc(100% - 30px)';
-            input.style.border = '1px solid #1a73e8';
-            input.style.borderRadius = '4px';
-            input.style.padding = '2px 4px';
-            input.style.fontSize = 'inherit';
-            input.style.fontFamily = 'inherit';
-            
-            // 替换 span 为 input
-            nameSpan.replaceWith(input);
-            input.focus();
-            input.select();
-            
-            const saveName = () => {
-                const newName = input.value.trim();
-                if (newName && newName !== currentName) {
-                    folder.name = newName;
-                    saveData();
-                    // 如果当前正好在看这个文件夹，刷新详情头
-                    if (state.activeFolderId === folder.id) {
-                        showDetailView(folder);
-                    }
-                }
-                renderFolders(); // 无论是否保存，都重新渲染以恢复 UI
-            };
-            
-            // 绑定保存事件
-            input.addEventListener('blur', saveName);
-            input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter') {
-                    input.blur(); // 触发 saveName
-                }
-                if (ev.key === 'Escape') {
-                    renderFolders(); // 取消
-                }
-            });
-            
-            input.addEventListener('click', (ev) => ev.stopPropagation());
+            e.preventDefault(); 
+            triggerFolderRename(folder, nameSpan);
         });
     }
     
@@ -578,7 +553,7 @@ function renderFolders() {
       li.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        showFolderContextMenu(e.clientX, e.clientY, folder);
+        showFolderContextMenu(e.clientX, e.clientY, folder, nameSpan);
       });
     }
 
@@ -613,7 +588,7 @@ function renderFolders() {
 }
 
 // --- 文件夹右键菜单 ---
-function showFolderContextMenu(x, y, folder) {
+function showFolderContextMenu(x, y, folder, nameSpanElement) {
   // 清除旧菜单
   const oldMenu = document.querySelector('.nlm-context-menu');
   if (oldMenu) oldMenu.remove();
@@ -624,6 +599,7 @@ function showFolderContextMenu(x, y, folder) {
   menu.style.top = `${y}px`;
 
   menu.innerHTML = `
+    <div class="nlm-context-menu-item" id="nlm-ctx-rename">重命名</div>
     <div class="nlm-context-menu-item danger" id="nlm-ctx-delete">删除文件夹</div>
   `;
 
@@ -638,11 +614,62 @@ function showFolderContextMenu(x, y, folder) {
   setTimeout(() => document.addEventListener('click', closeMenu), 0);
 
   // 绑定事件
+  menu.querySelector('#nlm-ctx-rename').addEventListener('click', () => {
+      triggerFolderRename(folder, nameSpanElement);
+  });
+
   menu.querySelector('#nlm-ctx-delete').addEventListener('click', () => {
     if (confirm(`确定要删除文件夹 "${folder.name}" 吗？\n文件夹内的文件将移至"全部"。`)) {
       deleteFolder(folder.id);
     }
   });
+}
+
+function triggerFolderRename(folder, nameSpan) {
+    if (!nameSpan) return;
+    
+    const currentName = folder.name;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'nlm-rename-input';
+    input.style.width = 'calc(100% - 30px)';
+    input.style.border = '1px solid #1a73e8';
+    input.style.borderRadius = '4px';
+    input.style.padding = '2px 4px';
+    input.style.fontSize = 'inherit';
+    input.style.fontFamily = 'inherit';
+    
+    // 替换 span 为 input
+    nameSpan.replaceWith(input);
+    input.focus();
+    input.select();
+    
+    const saveName = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+            folder.name = newName;
+            saveData();
+            // 如果当前正好在看这个文件夹，刷新详情头
+            if (state.activeFolderId === folder.id) {
+                showDetailView(folder);
+            }
+        }
+        renderFolders(); // 无论是否保存，都重新渲染以恢复 UI
+    };
+    
+    // 绑定保存事件
+    input.addEventListener('blur', saveName);
+    input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+            input.blur(); // 触发 saveName
+        }
+        if (ev.key === 'Escape') {
+            renderFolders(); // 取消
+        }
+    });
+    
+    input.addEventListener('click', (ev) => ev.stopPropagation());
 }
 
 function deleteFolder(folderId) {
@@ -769,27 +796,26 @@ function syncViewFromNative(retryCount = 0) {
         const normalizedName = normalizeFileName(fileName);
         let shouldBeChecked = false;
         
-        if (isGlobalSelectAllChecked) {
-            shouldBeChecked = true;
-        } else {
-            // Fuzzy lookup in nativeStates
-            // Try exact match first
-            if (nativeStates.hasOwnProperty(normalizedName)) {
-                shouldBeChecked = nativeStates[normalizedName];
-            } else {
-                // Try fuzzy match
-                const match = Object.keys(nativeStates).find(key => 
-                    (key.includes(normalizedName) && Math.abs(key.length - normalizedName.length) < 5) ||
-                    (normalizedName.includes(key) && Math.abs(normalizedName.length - key.length) < 5)
-                );
-                if (match) {
-                    shouldBeChecked = nativeStates[match];
-                } else {
-                     // Not found in native list (maybe folded/hidden), keep current state?
-                     // Or assume false if we are confident? 
-                     // Let's keep current state to be safe.
-                     shouldBeChecked = cb.checked; 
-                }
+        // Priority 1: Exact Native Match (Most Reliable)
+        if (nativeStates.hasOwnProperty(normalizedName)) {
+            shouldBeChecked = nativeStates[normalizedName];
+        } 
+        // Priority 2: Fuzzy Native Match
+        else {
+            const match = Object.keys(nativeStates).find(key => 
+                (key.includes(normalizedName) && Math.abs(key.length - normalizedName.length) < 5) ||
+                (normalizedName.includes(key) && Math.abs(normalizedName.length - key.length) < 5)
+            );
+            if (match) {
+                shouldBeChecked = nativeStates[match];
+            } 
+            // Priority 3: Global Select All (Fallback for hidden/unloaded items)
+            else if (isGlobalSelectAllChecked) {
+                shouldBeChecked = true;
+            }
+            // Priority 4: Keep Current State (Stability)
+            else {
+                 shouldBeChecked = cb.checked; 
             }
         }
         
@@ -883,17 +909,29 @@ function isChecked(checkbox) {
 
 // 辅助：安全点击 (兼容框架事件监听)
 function safeClick(element) {
-    // 1. 模拟鼠标点击流程
-    element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-    element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    // Set Flag to prevent recursive sync loops
+    state.isProgrammaticClick = true;
     
-    // 2. 原生点击
-    element.click();
-    
-    // 3. 强制分发 Angular/React 依赖的事件
-    // 注意：某些框架监听的是 input 的 change，有些是 click
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    element.dispatchEvent(new Event('input', { bubbles: true }));
+    try {
+        // 1. 模拟鼠标点击流程
+        element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+        element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+        
+        // 2. 原生点击
+        element.click();
+        
+        // 3. 强制分发 Angular/React 依赖的事件
+        // 注意：某些框架监听的是 input 的 change，有些是 click
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+    } finally {
+        // Reset Flag immediately after synchronous events are dispatched.
+        // If there are async side effects, we might need a timeout, but usually DOM events are sync.
+        // Let's keep it true for a tiny tick just in case.
+        setTimeout(() => {
+            state.isProgrammaticClick = false;
+        }, 0);
+    }
 }
 
  // --- 详情视图 (独立 List) ---
