@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.0.16] - 2026-01-27
+### Fixed
+- **UI Cleanup**: 移除了 NotebookLM 和 Gemini 界面中的冗余“移动到文件夹”菜单项。
+  - **NotebookLM**: 屏蔽了主页 (`/`) 和 Chat Panel（右侧对话面板）中的菜单注入，仅保留左侧资源列表中的功能。
+  - **Gemini**: 屏蔽了 Gems 列表中的菜单注入，仅保留普通对话列表的功能。
+- **Accuracy**: 引入了更精准的上下文判断逻辑（Context Guard），通过回溯触发按钮的位置来决定是否注入菜单，杜绝了误操作。
+
 ## [3.0.0.15] - 2026-01-25
 ### Fixed
 - **NotebookLM Observer Optimization**: 解决了全选时的视觉频闪和性能问题。

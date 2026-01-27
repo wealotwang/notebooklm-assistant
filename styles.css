@@ -617,9 +617,18 @@ body[data-theme="dark"] .nlm-timeline-dot:hover {
 
 /* Gemini Timeline Specifics */
 .gemini-timeline-bar {
-    right: 16px; /* Adjust based on Gemini scrollbar */
+    right: 24px; /* Increased from 16px to avoid native scrollbar overlap */
     z-index: 990;
     /* Ensure it sits on top of Gemini content */
+    height: 100%; /* Ensure full height */
+}
+
+.nlm-timeline-track {
+    pointer-events: none; /* Allow clicks to pass through track area */
+}
+
+.nlm-timeline-dot {
+    pointer-events: auto; /* Re-enable clicks on dots */
 }
 
 /* Adjust timeline tooltip for Gemini's dark mode if needed */

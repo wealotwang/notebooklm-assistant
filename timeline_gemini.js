@@ -273,6 +273,12 @@ function updateSlider() {
   if (!timelineState.container || !timelineState.slider) return;
 
   const { scrollTop, scrollHeight, clientHeight } = timelineState.container;
+  
+  if (scrollHeight <= clientHeight) {
+    timelineState.slider.style.display = 'none';
+    return;
+  }
+
   const n = scrollTop / scrollHeight;
   const h = clientHeight / scrollHeight;
 

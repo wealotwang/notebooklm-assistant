@@ -207,18 +207,39 @@ function findSidebarNav() {
    }
    
    // Bind Events
-   container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
-     e.stopPropagation();
-     const name = prompt("新建文件夹名称:");
-     if (name) {
-       state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
-       saveData();
-       renderFolders();
-     }
-   });
-   
-   renderFolders();
- }
+  container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const name = prompt("新建文件夹名称:");
+    if (name) {
+      state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
+      saveData();
+      renderFolders();
+    }
+  });
+
+  // Auto-hide on collapse (Sidebar Squeeze Fix)
+  // We observe the parent of the container (which is inside the sidebar)
+  // Or the grand-parent if needed. 
+  // Gemini sidebar usually collapses by reducing width.
+  const sidebarContainer = targetElement.parentElement;
+  if (sidebarContainer) {
+      const resizeObserver = new ResizeObserver(entries => {
+          for (let entry of entries) {
+              // Gemini collapsed sidebar is usually very narrow (e.g. 72px or 80px)
+              // Expanded is usually > 200px.
+              // We pick a safe threshold, e.g. 150px.
+              if (entry.contentRect.width < 150) {
+                  container.style.display = 'none';
+              } else {
+                  container.style.display = 'block';
+              }
+          }
+      });
+      resizeObserver.observe(sidebarContainer);
+  }
+  
+  renderFolders();
+}
 
 // --- Debugging ---
 const DOMService = {
@@ -236,23 +257,9 @@ const DOMService = {
   }
 };
 
-// Visual Connectivity Test (Red Box)
-function showDebugBox() {
-    const box = document.createElement('div');
-    box.style.position = 'fixed';
-    box.style.top = '10px';
-    box.style.right = '10px';
-    box.style.width = '20px';
-    box.style.height = '20px';
-    box.style.backgroundColor = 'red';
-    box.style.zIndex = '999999';
-    box.title = 'Gemini Module Active';
-    box.style.pointerEvents = 'none';
-    document.body.appendChild(box);
-    DOMService.log("Debug Box Injected");
-}
-
-showDebugBox();
+// Visual Connectivity Test (Red Box) - REMOVED
+// function showDebugBox() { ... }
+// showDebugBox();
 
 // --- Message Listener for Popup ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -261,6 +268,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+
+// --- Renaming Logic ---
+function enableRenaming(folderId, spanElement, currentName) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.className = 'nlm-folder-rename-input';
+  input.style.width = '100px';
+  input.style.padding = '2px 4px';
+  input.style.border = '1px solid #1a73e8';
+  input.style.borderRadius = '4px';
+  input.style.fontSize = '14px';
+  
+  // Replace span with input
+  spanElement.replaceWith(input);
+  input.focus();
+  input.select();
+  
+  const save = () => {
+    const newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      const folder = state.folders.find(f => f.id === folderId);
+      if (folder) {
+        folder.name = newName;
+        saveData();
+      }
+    }
+    renderFolders(); // Re-render to restore span
+  };
+  
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      save();
+    } else if (e.key === 'Escape') {
+      renderFolders(); // Cancel
+    }
+  });
+  
+  input.addEventListener('click', e => e.stopPropagation());
+}
 
 function renderFolders() {
   const list = document.getElementById('gemini-folder-list');
@@ -276,7 +324,16 @@ function renderFolders() {
     
     let removeBtnHtml = folder.id !== 'all' ? `<span class="nlm-folder-remove" title="删除文件夹">×</span>` : '';
 
-    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span>${folder.name}</span>${removeBtnHtml}`;
+    li.innerHTML = `<svg class="nlm-icon" viewBox="0 0 24 24"><path d="${iconPath}"/></svg><span class="nlm-folder-name">${folder.name}</span>${removeBtnHtml}`;
+    
+    // Rename Event (Double Click)
+    const nameSpan = li.querySelector('.nlm-folder-name');
+    if (folder.id !== 'all' && nameSpan) {
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            enableRenaming(folder.id, nameSpan, folder.name);
+        });
+    }
     
     // Delete Event
     const removeBtn = li.querySelector('.nlm-folder-remove');
@@ -325,6 +382,28 @@ function setupGlobalClickListener() {
     
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    // Gem Guard: If the button is inside the Gems list, ignore it.
+    if (btn.closest('.gems-list-container') || btn.closest('[data-test-id="gems-list"]')) {
+         DOMService.log("GlobalListener: Ignored click on Gem item.");
+         return;
+    }
+
+    // Gem Guard (Link Check): If the associated link is a Gem link, ignore it.
+    // Usually Gem links are like /app/gem/...
+    // We need to check the link associated with this button.
+    let guardContainer = btn.parentElement;
+    for (let i = 0; i < 5; i++) {
+        if (!guardContainer) break;
+        const link = guardContainer.querySelector('a[href^="/app/"]');
+        if (link && link.getAttribute('href').includes('/gem/')) {
+             DOMService.log("GlobalListener: Ignored click on Gem link.");
+             return;
+        }
+        guardContainer = guardContainer.parentElement;
+    }
+
+    state.lastClickedButton = btn;
 
     // Check if this button is likely the "More options" button
     // It might have an aria-label or specific icon

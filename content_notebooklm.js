@@ -1437,6 +1437,23 @@ function extractFileNameFromRow(row) {
 
 
 function injectMenuItem(menuNode) {
+  // 1. Homepage Guard: Do not inject on homepage
+  if (window.location.pathname === '/' || !window.location.pathname.includes('/notebook/')) {
+      return;
+  }
+
+  // 2. Context Guard: Only inject if triggered from a Source Row
+  // We check the button that triggered this menu (it has aria-expanded="true")
+  const triggerBtn = document.querySelector('button[aria-expanded="true"]');
+  if (triggerBtn) {
+      // If the trigger button is NOT inside a known source row container, ignore it.
+      // This effectively blocks Chat Panel menus, Notebook Title menus, etc.
+      if (!triggerBtn.closest('.row') && !triggerBtn.closest('.single-source-container')) {
+           console.log("NotebookLM Extension: Ignoring menu injection (Context: Not a Source Row)");
+           return;
+      }
+  }
+
   // 确保我们操作的是 mat-mdc-menu-content
   let menuContent = menuNode;
   if (!menuContent.classList.contains('mat-mdc-menu-content')) {
