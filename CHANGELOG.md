@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.0.18] - 2026-02-01
+### Fixed
+- **Gemini: Gem Menu Blocking**: 优化了拦截逻辑，通过 `aria-expanded` 属性实时定位触发源，彻底移除了 Gems 列表中的“移动到文件夹”选项。
+- **Gemini: Shared Gems Sidebar Integration**: 
+  - 将共享 Gem 的“固定”功能集成到侧边栏中，不再干扰原生页面 Header。
+  - 当访问共享 Gem 页面时，侧边栏会自动出现“+ 固定当前”按钮。
+  - 优化了显示逻辑：该区域仅在有固定数据或处于可固定页面时显示，保持界面清爽。
+
 ## [3.0.0.17] - 2026-02-01
 ### Added
 - **Gemini: Shared Gems Pinning**: 新增“共享给我的 Gem”收藏功能。

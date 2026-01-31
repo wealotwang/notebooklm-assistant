@@ -17,7 +17,6 @@ function init() {
   loadData(() => {
     startObserver();
     setupGlobalClickListener();
-    checkAndAddPinButton();
   });
 }
 
@@ -204,6 +203,9 @@ function findSidebarNav() {
     <div id="nlm-shared-gems-section" style="display: none; margin-bottom: 12px;">
       <div class="nlm-folder-header">
         <span>共享给我的 Gem</span>
+        <div class="nlm-header-actions" id="nlm-shared-gem-actions">
+          <!-- Pin current button will be injected here -->
+        </div>
       </div>
       <ul class="nlm-folder-list" id="gemini-shared-gems-list"></ul>
     </div>
@@ -301,21 +303,51 @@ function findSidebarNav() {
 function renderSharedGems() {
     const section = document.getElementById('nlm-shared-gems-section');
     const list = document.getElementById('gemini-shared-gems-list');
+    const actions = document.getElementById('nlm-shared-gem-actions');
     if (!section || !list) return;
 
-    if (state.sharedGems.length === 0) {
+    const url = window.location.href;
+    const isSharedGemPage = url.includes('gemini.google.com/gem/');
+    const gemId = isSharedGemPage ? url.split('/gem/')[1].split('?')[0] : null;
+    const isAlreadyPinned = gemId && state.sharedGems.find(g => g.id === gemId);
+
+    // Show section if we have data OR if we are on a shareable page that can be pinned
+    if (state.sharedGems.length === 0 && (!isSharedGemPage || isAlreadyPinned)) {
         section.style.display = 'none';
         return;
     }
 
     section.style.display = 'block';
     list.innerHTML = '';
+    
+    // Update Pin Current Button
+    if (actions) {
+        actions.innerHTML = '';
+        if (isSharedGemPage && !isAlreadyPinned) {
+            const pinBtn = document.createElement('button');
+            pinBtn.className = 'nlm-add-btn';
+            pinBtn.title = '固定当前共享 Gem';
+            pinBtn.textContent = '+';
+            pinBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const titleEl = document.querySelector('h1, .gem-title, title');
+                const title = titleEl ? (titleEl.textContent.replace('Google Gemini', '').trim() || '共享 Gem') : '共享 Gem';
+                
+                state.sharedGems.push({
+                    id: gemId,
+                    name: title,
+                    url: url
+                });
+                saveData();
+                renderSharedGems();
+            });
+            actions.appendChild(pinBtn);
+        }
+    }
 
     state.sharedGems.forEach(gem => {
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';
-        
-        const iconPath = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'; // Checkmark icon or similar
         
         li.innerHTML = `
             <svg class="nlm-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.76 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.93 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
@@ -341,46 +373,7 @@ function renderSharedGems() {
 }
 
 function checkAndAddPinButton() {
-    // Check if current page is a shared Gem
-    const url = window.location.href;
-    if (!url.includes('gemini.google.com/gem/')) return;
-    
-    // Check if already pinned
-    const gemId = url.split('/gem/')[1].split('?')[0];
-    if (state.sharedGems.find(g => g.id === gemId)) return;
-
-    // Use observer to wait for header or specific area to inject button
-    const observer = new MutationObserver((mutations, obs) => {
-        const header = document.querySelector('header, .header-container, .top-bar');
-        if (header && !document.querySelector('#nlm-pin-gem-btn')) {
-            const btn = document.createElement('button');
-            btn.id = 'nlm-pin-gem-btn';
-            btn.className = 'nlm-btn nlm-btn-primary';
-            btn.style.marginLeft = '16px';
-            btn.style.padding = '4px 12px';
-            btn.style.fontSize = '12px';
-            btn.textContent = '固定此共享 Gem';
-            
-            btn.addEventListener('click', () => {
-                const titleEl = document.querySelector('h1, .gem-title, title');
-                const title = titleEl ? (titleEl.textContent.replace('Google Gemini', '').trim() || '共享 Gem') : '共享 Gem';
-                
-                state.sharedGems.push({
-                    id: gemId,
-                    name: title,
-                    url: url
-                });
-                saveData();
-                btn.remove();
-                renderSharedGems();
-            });
-            
-            header.appendChild(btn);
-            obs.disconnect();
-        }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Deprecated: Logic moved to renderSharedGems sidebar
 }
 
 // --- Debugging ---
@@ -596,32 +589,36 @@ function setupGlobalClickListener() {
   }, true); // Capture phase
 }
 
-// 2. Inject Menu Item
 function injectMenuItem(menuNode) {
-    // 1. Context Guard: Check if we should inject based on the last clicked button
-    const triggerBtn = state.lastClickedButton;
-    if (triggerBtn) {
-        // Gem Guard: If the trigger button is inside the Gems list, ignore it.
-        if (triggerBtn.closest('.gems-list-container') || triggerBtn.closest('[data-test-id="gems-list"]')) {
-             console.log("Gemini Extension: Ignoring menu injection for Gem item.");
-             return;
-        }
+  // 1. Context Guard: Find the button that triggered this menu
+  const triggerBtn = document.querySelector('button[aria-expanded="true"]');
+  if (triggerBtn) {
+      // Check if button is inside the Gems list
+      const isGemItem = triggerBtn.closest('.gems-list-container') || 
+                        triggerBtn.closest('[data-test-id="gems-list"]') ||
+                        triggerBtn.closest('.side-nav-entry-container');
+      
+      // Also check the link associated with this item
+      let isGemLink = false;
+      let container = triggerBtn.parentElement;
+      for (let i = 0; i < 5; i++) {
+          if (!container) break;
+          const link = container.querySelector('a[href*="/gem/"]');
+          if (link) {
+              isGemLink = true;
+              break;
+          }
+          container = container.parentElement;
+      }
 
-        // Gem Guard (Link Check): Double check the link associated with this button.
-        let guardContainer = triggerBtn.parentElement;
-        for (let i = 0; i < 5; i++) {
-            if (!guardContainer) break;
-            const link = guardContainer.querySelector('a[href^="/app/"]');
-            if (link && link.getAttribute('href').includes('/gem/')) {
-                 console.log("Gemini Extension: Ignoring menu injection for Gem link.");
-                 return;
-            }
-            guardContainer = guardContainer.parentElement;
-        }
-    }
+      if (isGemItem || isGemLink) {
+           console.log("Gemini Extension: Blocking 'Move to folder' for Gem item.");
+           return;
+      }
+  }
 
-    // menuNode is likely .conversation-actions-menu
-    const content = menuNode.querySelector('.mat-mdc-menu-content');
+  // menuNode is likely .conversation-actions-menu
+  const content = menuNode.querySelector('.mat-mdc-menu-content');
     if (!content || content.querySelector('.nlm-menu-item')) return;
     
     console.log("Injecting Gemini Menu Item...");
