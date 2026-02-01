@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.0.20] - 2026-02-01
+### Fixed
+- **Gemini: Shared Gems Precise Naming**: 彻底解决了共享 Gem 只能抓取到 "Gemini" 默认名称的问题。
+  - **多源提取**: 同步监听 DOM 元素（动画容器、H1）与 `document.title`。
+  - **智能过滤**: 自动识别并跳过 "Gemini", "Google Gemini" 等通用名称，直到探测到真实标题（如“医药代表 Kevin”）。
+  - **自我纠错**: 若侧边栏已存在名为 "Gemini" 的旧数据，再次访问时插件会自动用真实名称进行覆盖更新。
+  - **SPA 适配**: 增加了 URL 变化监听，支持在应用内导航时即时触发名称抓取。
+
 ## [3.0.0.19] - 2026-02-01
 ### Refactored
 - **Gemini: Shared Gems Auto-Pinning**: 现在进入共享 Gem 页面后，插件会自动识别 Gem 名称并固定到侧边栏，无需手动操作。

@@ -18,6 +18,15 @@ function init() {
     startObserver();
     setupGlobalClickListener();
     setupAutoPinObserver();
+    
+    // Watch for URL changes (SPA)
+    let lastUrl = window.location.href;
+    setInterval(() => {
+        if (window.location.href !== lastUrl) {
+            lastUrl = window.location.href;
+            setupAutoPinObserver();
+        }
+    }, 2000);
   });
 }
 
@@ -27,26 +36,74 @@ function setupAutoPinObserver() {
     if (!url.includes('gemini.google.com/gem/')) return;
 
     const gemId = url.split('/gem/')[1].split('?')[0];
+    DOMService.log(`[Name-Search] Started search for Gem: ${gemId}`);
     
-    // Check if already pinned
-    if (state.sharedGems.find(g => g.id === gemId)) return;
+    const isInvalidName = (name) => {
+        if (!name) return true;
+        const lower = name.toLowerCase();
+        return lower === 'gemini' || lower === 'google gemini' || lower === 'untitled' || lower === 'loading...';
+    };
 
-    // Observe DOM to find the Gem name
-    const observer = new MutationObserver((mutations, obs) => {
-        // Based on user screenshot, the name is in .bot-name-container or .bot-name-container-animation-box
-        const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container');
-        if (nameEl && nameEl.textContent.trim()) {
-            const title = nameEl.textContent.trim();
-            
-            state.sharedGems.push({
-                id: gemId,
-                name: title,
-                url: url
-            });
+    const updateGemName = (name) => {
+        if (isInvalidName(name)) return false;
+        
+        const existingIdx = state.sharedGems.findIndex(g => g.id === gemId);
+        if (existingIdx >= 0) {
+            // Self-Correction: If current name is generic, update it
+            if (isInvalidName(state.sharedGems[existingIdx].name)) {
+                DOMService.log(`[Name-Search] Correcting name: ${state.sharedGems[existingIdx].name} -> ${name}`);
+                state.sharedGems[existingIdx].name = name;
+                saveData();
+                renderSharedGems();
+                return true;
+            }
+            return false; // Already have a good name
+        } else {
+            // New Pin
+            DOMService.log(`[Name-Search] Auto-pinning: ${name}`);
+            state.sharedGems.push({ id: gemId, name: name, url: url });
             saveData();
-            DOMService.log(`Auto-pinned Shared Gem: ${title}`);
             renderSharedGems();
+            return true;
+        }
+    };
+
+    // 1. Try Script Data (Fastest)
+    const initialData = document.getElementById('bard-initial-data');
+    if (initialData) {
+        try {
+            const text = initialData.textContent;
+            // Usually contains titles in quotes. This is a heuristic regex.
+            const match = text.match(/"([^"]{3,100})"/); 
+            // Better to just monitor DOM as script parsing is risky without schema
+        } catch(e) {}
+    }
+
+    // 2. Continuous Observer
+    let attempts = 0;
+    const observer = new MutationObserver((mutations, obs) => {
+        attempts++;
+        
+        // Strategy A: DOM elements
+        const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container, h1');
+        const nameFromDOM = nameEl ? nameEl.textContent.trim() : '';
+        
+        // Strategy B: Document Title (often updated by Gemini)
+        const nameFromTitle = document.title.replace('Google Gemini', '').replace('- Gemini', '').trim();
+
+        if (updateGemName(nameFromDOM)) {
             obs.disconnect();
+            return;
+        }
+        
+        if (updateGemName(nameFromTitle)) {
+            obs.disconnect();
+            return;
+        }
+
+        if (attempts > 100) { // Stop after ~10-20 seconds
+            obs.disconnect();
+            DOMService.log(`[Name-Search] Search timed out for ${gemId}`);
         }
     });
 
