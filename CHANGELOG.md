@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.0.19] - 2026-02-01
+### Refactored
+- **Gemini: Shared Gems Auto-Pinning**: 现在进入共享 Gem 页面后，插件会自动识别 Gem 名称并固定到侧边栏，无需手动操作。
+- **Gemini: Native-like Sidebar UI**: 
+  - 侧边栏中的共享 Gem 现在会显示其真实名称（如“医药行业资料补充研究”）。
+  - 每个列表项都配备了标准的“三个点”菜单，交互体验与原生侧边栏高度统一。
+  - 点击“三个点”可以轻松从列表中移除共享项。
+- **Version Management**: 增加了 Git 标签 (`v3.0.0.19`)，确保版本可回溯。
+
 ## [3.0.0.18] - 2026-02-01
 ### Fixed
 - **Gemini: Gem Menu Blocking**: 优化了拦截逻辑，通过 `aria-expanded` 属性实时定位触发源，彻底移除了 Gems 列表中的“移动到文件夹”选项。

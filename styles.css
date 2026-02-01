@@ -52,12 +52,85 @@
   color: #3c4043;
   font-size: 14px;
   user-select: none;
+  position: relative; /* For action placement */
 }
 
 .nlm-folder-item:hover {
   background-color: rgba(255, 255, 255, 0.9); /* More opaque on hover */
   border-color: #dadce0;
   box-shadow: 0 1px 2px rgba(60, 64, 67, 0.1);
+}
+
+.nlm-folder-actions {
+    display: none;
+    margin-left: auto;
+    align-items: center;
+}
+
+.nlm-folder-item:hover .nlm-folder-actions {
+    display: flex;
+}
+
+.nlm-more-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5f6368;
+}
+
+.nlm-more-btn:hover {
+    background-color: rgba(60, 64, 67, 0.1);
+    color: #1a73e8;
+}
+
+.nlm-more-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* Context Menu */
+.nlm-context-menu {
+    position: fixed;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px 0 rgba(60,64,67,.30), 0 2px 6px 2px rgba(60,64,67,.15);
+    padding: 8px 0;
+    min-width: 160px;
+    z-index: 10000;
+}
+
+.nlm-context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #3c4043;
+}
+
+.nlm-context-menu-item:hover {
+    background-color: #f1f3f4;
+}
+
+.nlm-context-menu-item svg {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    fill: #5f6368;
+}
+
+.nlm-context-menu-item.delete {
+    color: #d93025;
+}
+
+.nlm-context-menu-item.delete svg {
+    fill: #d93025;
 }
 
 /* 选中状态 */

@@ -17,7 +17,40 @@ function init() {
   loadData(() => {
     startObserver();
     setupGlobalClickListener();
+    setupAutoPinObserver();
   });
+}
+
+// --- Auto-Pin Shared Gems ---
+function setupAutoPinObserver() {
+    const url = window.location.href;
+    if (!url.includes('gemini.google.com/gem/')) return;
+
+    const gemId = url.split('/gem/')[1].split('?')[0];
+    
+    // Check if already pinned
+    if (state.sharedGems.find(g => g.id === gemId)) return;
+
+    // Observe DOM to find the Gem name
+    const observer = new MutationObserver((mutations, obs) => {
+        // Based on user screenshot, the name is in .bot-name-container or .bot-name-container-animation-box
+        const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container');
+        if (nameEl && nameEl.textContent.trim()) {
+            const title = nameEl.textContent.trim();
+            
+            state.sharedGems.push({
+                id: gemId,
+                name: title,
+                url: url
+            });
+            saveData();
+            DOMService.log(`Auto-pinned Shared Gem: ${title}`);
+            renderSharedGems();
+            obs.disconnect();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // --- Data Management ---
@@ -203,9 +236,6 @@ function findSidebarNav() {
     <div id="nlm-shared-gems-section" style="display: none; margin-bottom: 12px;">
       <div class="nlm-folder-header">
         <span>共享给我的 Gem</span>
-        <div class="nlm-header-actions" id="nlm-shared-gem-actions">
-          <!-- Pin current button will be injected here -->
-        </div>
       </div>
       <ul class="nlm-folder-list" id="gemini-shared-gems-list"></ul>
     </div>
@@ -303,47 +333,15 @@ function findSidebarNav() {
 function renderSharedGems() {
     const section = document.getElementById('nlm-shared-gems-section');
     const list = document.getElementById('gemini-shared-gems-list');
-    const actions = document.getElementById('nlm-shared-gem-actions');
     if (!section || !list) return;
 
-    const url = window.location.href;
-    const isSharedGemPage = url.includes('gemini.google.com/gem/');
-    const gemId = isSharedGemPage ? url.split('/gem/')[1].split('?')[0] : null;
-    const isAlreadyPinned = gemId && state.sharedGems.find(g => g.id === gemId);
-
-    // Show section if we have data OR if we are on a shareable page that can be pinned
-    if (state.sharedGems.length === 0 && (!isSharedGemPage || isAlreadyPinned)) {
+    if (state.sharedGems.length === 0) {
         section.style.display = 'none';
         return;
     }
 
     section.style.display = 'block';
     list.innerHTML = '';
-    
-    // Update Pin Current Button
-    if (actions) {
-        actions.innerHTML = '';
-        if (isSharedGemPage && !isAlreadyPinned) {
-            const pinBtn = document.createElement('button');
-            pinBtn.className = 'nlm-add-btn';
-            pinBtn.title = '固定当前共享 Gem';
-            pinBtn.textContent = '+';
-            pinBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const titleEl = document.querySelector('h1, .gem-title, title');
-                const title = titleEl ? (titleEl.textContent.replace('Google Gemini', '').trim() || '共享 Gem') : '共享 Gem';
-                
-                state.sharedGems.push({
-                    id: gemId,
-                    name: title,
-                    url: url
-                });
-                saveData();
-                renderSharedGems();
-            });
-            actions.appendChild(pinBtn);
-        }
-    }
 
     state.sharedGems.forEach(gem => {
         const li = document.createElement('li');
@@ -352,24 +350,65 @@ function renderSharedGems() {
         li.innerHTML = `
             <svg class="nlm-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.76 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.93 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
             <span class="nlm-folder-name" title="${gem.name}">${gem.name}</span>
-            <span class="nlm-folder-remove" data-id="${gem.id}" title="取消固定">×</span>
+            <div class="nlm-folder-actions">
+              <button class="nlm-more-btn" title="更多操作">
+                <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+              </button>
+            </div>
         `;
 
-        li.addEventListener('click', () => {
+        li.addEventListener('click', (e) => {
+            if (e.target.closest('.nlm-more-btn')) return;
             window.location.href = gem.url;
         });
 
-        const removeBtn = li.querySelector('.nlm-folder-remove');
-        removeBtn.addEventListener('click', (e) => {
+        const moreBtn = li.querySelector('.nlm-more-btn');
+        moreBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const id = removeBtn.getAttribute('data-id');
-            state.sharedGems = state.sharedGems.filter(g => g.id !== id);
-            saveData();
-            renderSharedGems();
+            showSharedGemMenu(e, gem.id);
         });
 
         list.appendChild(li);
     });
+}
+
+function showSharedGemMenu(event, gemId) {
+    // Remove existing menus
+    document.querySelectorAll('.nlm-context-menu').forEach(m => m.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'nlm-context-menu';
+    menu.innerHTML = `
+        <div class="nlm-context-menu-item delete">
+            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span>移除此共享 Gem</span>
+        </div>
+    `;
+
+    // Position menu near the button
+    const rect = event.target.closest('button').getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.style.left = `${rect.left - 120}px`;
+    menu.style.zIndex = '10000';
+
+    menu.querySelector('.delete').addEventListener('click', () => {
+        state.sharedGems = state.sharedGems.filter(g => g.id !== gemId);
+        saveData();
+        renderSharedGems();
+        menu.remove();
+    });
+
+    document.body.appendChild(menu);
+
+    // Close menu when clicking outside
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
 }
 
 function checkAndAddPinButton() {
