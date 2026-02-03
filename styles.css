@@ -281,9 +281,33 @@
   /* 确保 Gemini 页面上的 z-index 足够高 */
 .nlm-folder-container.gemini-folder-container {
     z-index: 900;
-    margin-bottom: 16px; /* Space between folders and chat history */
-    margin-top: 8px;     /* Space from Gems */
+    margin-bottom: 12px; /* Reduced to save space */
+    margin-top: 4px;     /* Reduced to save space */
     padding: 0 12px;     /* Match Gemini sidebar padding */
+    max-height: none !important; /* Force all content to show */
+    overflow: visible !important;
+}
+
+/* 共享 Gem 列表特有样式：改为垂直列表而非胶囊 */
+#gemini-shared-gems-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+#gemini-shared-gems-list .nlm-folder-item {
+    border-radius: 8px; /* Less rounded for list look */
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    background-color: transparent;
+    border: 1px solid transparent;
+}
+
+#gemini-shared-gems-list .nlm-folder-item:hover {
+    background-color: rgba(60, 64, 67, 0.08);
 }
 
 /* Gemini Sidebar Tweaks */

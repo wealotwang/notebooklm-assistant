@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../Downloads/4-其他/gemini-voyager-main"
+		},
+		{
+			"path": "../google-ai-companion-v3.0.0.24"
 		}
 	],
 	"settings": {}

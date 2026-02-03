@@ -47,6 +47,18 @@
       "content": "NotebookLM: Fix source deletion sync (ghost files)",
       "priority": "high",
       "status": "completed"
+    },
+    {
+      "id": "9",
+      "content": "Sync codebase with v3.0.0.24 (Gemini enhancements)",
+      "priority": "high",
+      "status": "completed"
+    },
+    {
+      "id": "9",
+      "content": "Sync codebase with v3.0.0.24 (Gemini enhancements)",
+      "priority": "high",
+      "status": "completed"
     }
   ]
 }

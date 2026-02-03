@@ -33,7 +33,8 @@ function init() {
 // --- Auto-Pin Shared Gems ---
 function setupAutoPinObserver() {
     const url = window.location.href;
-    if (!url.includes('gemini.google.com/gem/')) return;
+    // Only trigger auto-pin if it's a shared Gem link (contains usp=sharing)
+    if (!url.includes('gemini.google.com/gem/') || !url.includes('usp=sharing')) return;
 
     const gemId = url.split('/gem/')[1].split('?')[0];
     DOMService.log(`[Name-Search] Started search for Gem: ${gemId}`);
@@ -392,7 +393,13 @@ function renderSharedGems() {
     const list = document.getElementById('gemini-shared-gems-list');
     if (!section || !list) return;
 
-    if (state.sharedGems.length === 0) {
+    // Check if current page is a shared Gem not yet pinned
+    const url = window.location.href;
+    const isSharedLink = url.includes('gemini.google.com/gem/') && url.includes('usp=sharing');
+    const gemId = isSharedLink ? url.split('/gem/')[1].split('?')[0] : null;
+    const alreadyPinned = gemId ? state.sharedGems.some(g => g.id === gemId) : false;
+
+    if (state.sharedGems.length === 0 && !isSharedLink) {
         section.style.display = 'none';
         return;
     }
@@ -400,6 +407,27 @@ function renderSharedGems() {
     section.style.display = 'block';
     list.innerHTML = '';
 
+    // 1. Add "Pin Current Gem" button if applicable
+    if (isSharedLink && !alreadyPinned) {
+        const pinBtn = document.createElement('li');
+        pinBtn.className = 'nlm-folder-item pin-current-btn';
+        pinBtn.style.border = '1px dashed #1a73e8';
+        pinBtn.style.color = '#1a73e8';
+        pinBtn.style.justifyContent = 'center';
+        pinBtn.style.marginBottom = '8px';
+        pinBtn.innerHTML = `
+            <span style="font-weight: 500;">+ 固定当前 Gem</span>
+        `;
+        pinBtn.addEventListener('click', () => {
+            // Trigger the auto-pin logic manually
+            setupAutoPinObserver();
+            // Force a re-render after a short delay to show the new item
+            setTimeout(renderSharedGems, 1000);
+        });
+        list.appendChild(pinBtn);
+    }
+
+    // 2. Render all shared Gems
     state.sharedGems.forEach(gem => {
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';

@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.0.25] - 2026-02-03
+### Fixed
+- **Gemini: Shared Gems Trigger Logic**: 现在仅在 URL 包含 `usp=sharing` 时才会触发自动固定逻辑，解决了新建/保存普通 Gem 时误触发的问题。
+- **Gemini: Sidebar Display Fix**: 
+  - 移除了共享 Gem 列表的高度限制，确保所有固定的共享项都能完整显示。
+  - 将共享 Gem 列表改为垂直布局，减少对侧边栏空间的垂直占用。
+  - 优化了插件容器的间距，减少对 Gemini 原生 Gem 列表显示数量的影响。
+- **Gemini: Manual Pin Support**: 在共享页面增加了“固定当前 Gem”的快捷按钮，提升交互灵活性。
+
 ## [3.0.0.20] - 2026-02-01
 ### Fixed
 - **Gemini: Shared Gems Precise Naming**: 彻底解决了共享 Gem 只能抓取到 "Gemini" 默认名称的问题。
