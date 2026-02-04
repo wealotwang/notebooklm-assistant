@@ -6,6 +6,22 @@
 
 ## 📅 核心演进时间轴
 
+### 🚀 Phase 3.9: 异步数据加载与判定加固 (Async Data & Strict Rules)
+**周期:** 2026-02-03 (v3.0.0.33)
+
+#### 1. 异步数据竞争的终结 (Ending Data Race)
+*   **挑战**: 之前版本中，UI 注入 (`injectFolderUI`) 与数据加载 (`loadData`) 是并行执行的。由于 `chrome.storage.local.get` 是异步的，往往 UI 渲染完了数据还没回来，导致列表为空，直到用户手动操作触发重绘。
+*   **修复**: 重构初始化流程，引入 Promise 链式调用。强制要求 **Data First, UI Second**——即只有当数据完全加载到内存后，才允许 UI 注入逻辑启动。
+
+#### 2. 共享判定逻辑的净化 (Purifying Shared Logic)
+*   **挑战**: 之前为了应对 URL 清洗引入了复杂的 Session 清理逻辑，导致在页面快速跳转时状态丢失，固定按钮时有时无。同时，对于非共享链接的判定不够严格。
+*   **修复**: 
+    *   **移除不稳定逻辑**: 删除了自动清理 Session 的代码，让状态更持久。
+    *   **优先级明确**: URL 中的 `usp=sharing` 是最高优先级信号。
+    *   **兜底机制**: 增加最后一道防线，如果 URL 无参数且 Session 无记录，强制隐藏按钮，彻底解决误触发问题。
+
+---
+
 ### 🚀 Phase 3.8: 响应式折叠与稳健渲染 (Responsive Collapse & Robust Rendering)
 **周期:** 2026-02-03 (v3.0.0.31)
 

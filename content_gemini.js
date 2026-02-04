@@ -14,12 +14,28 @@ let state = {
 
 // --- Initialization ---
 function init() {
-  loadData(() => {
-    startObserver();
+  DOMService.log("Init triggered (v3.0.0.33)");
+  
+  // 1. Data First: Wait for data to load before injecting UI
+  // This fixes the "empty folder list on refresh" bug
+  loadData().then(() => {
+    DOMService.log("Data loaded, starting UI injection...");
+    
+    // Initial injection
+    injectFolderUI();
+    
+    // Watch for DOM changes to keep UI injected
+    const observer = new MutationObserver((mutations) => {
+        if (!document.querySelector('.nlm-folder-container')) {
+            injectFolderUI();
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    
     setupGlobalClickListener();
     setupAutoPinObserver();
     
-    // Handle URL changes for auto-pinning shared gems
+    // Handle URL changes
     let lastUrl = window.location.href;
     new MutationObserver(() => {
         const url = window.location.href;
@@ -36,19 +52,18 @@ function init() {
 function setupAutoPinObserver() {
     const url = window.location.href;
     
-    // 1. Detect and Persist Share State
+    // Simplified Logic (v3.0.0.33):
+    // Only persist state if usp=sharing is explicitly present.
+    // We REMOVED the auto-cleanup logic that was causing state loss.
     if (url.includes('gemini.google.com/gem/') && url.includes('usp=sharing')) {
         const gemId = url.split('/gem/')[1].split('?')[0];
         if (gemId) {
             sessionStorage.setItem('nlm_pending_share_gem', gemId);
             console.log(`[Gemini] Detected shared Gem: ${gemId}, state saved.`);
         }
-    } else if (!url.includes('gemini.google.com/gem/')) {
-        // Clear state if we navigate away from a Gem page
-        sessionStorage.removeItem('nlm_pending_share_gem');
     }
-
-    // Only trigger auto-pin if it's a shared Gem link (contains usp=sharing)
+    
+    // Only proceed with auto-pin logic if it's a shared link
     if (!url.includes('gemini.google.com/gem/') || !url.includes('usp=sharing')) return;
 
     const gemId = url.split('/gem/')[1].split('?')[0];
@@ -414,26 +429,34 @@ function renderSharedGems() {
     // Check if current page is a shared Gem not yet pinned
     const url = window.location.href;
     
-    // Logic Update: Check both URL and Session Storage
+    // Logic Update (v3.0.0.33): Check both URL and Session Storage
+    // PRIORITY 1: URL has usp=sharing (Absolute Truth)
+    // PRIORITY 2: Session has record (Persisted Truth for Cleaned URLs)
     let isSharedLink = false;
     let gemId = null;
 
     if (url.includes('gemini.google.com/gem/')) {
-        // Case A: URL has usp=sharing (Strong signal)
+        // Case A: URL has usp=sharing (Strongest Signal)
         if (url.includes('usp=sharing')) {
             isSharedLink = true;
             gemId = url.split('/gem/')[1].split('?')[0];
         } 
-        // Case B: URL cleaned, but Session has record (Persisted signal)
+        // Case B: URL cleaned, but Session has record
         else {
             const storedGemId = sessionStorage.getItem('nlm_pending_share_gem');
             const currentGemId = url.split('/gem/')[1].split('?')[0];
+            // STRICT CHECK: Only if session matches current page ID
             if (storedGemId && storedGemId === currentGemId) {
                 isSharedLink = true;
                 gemId = currentGemId;
             }
         }
     }
+
+    // STRICT SAFETY NET: If we still think it's a shared link, but we have NO proof
+    // (no URL param AND no session match), then force it to false.
+    // This prevents "ghost" buttons on your own Gems.
+    if (isSharedLink && !gemId) isSharedLink = false;
 
     const alreadyPinned = gemId ? state.sharedGems.some(g => g.id === gemId) : false;
 

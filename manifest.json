@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Google AI Companion",
-  "version": "3.0.0.31",
+  "version": "3.0.0.33",
   "description": "Enhance your Google AI experience (NotebookLM & Gemini) with Folders, Timelines, and more.",
   "permissions": ["storage"],
   "host_permissions": [

@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.0.33] - 2026-02-03
+### Fixed
+- **Gemini: Async Data Loading**: 彻底修复了“文件夹列表刷新后为空”的 Bug。通过重构 `init` 流程，强制要求先等待 `loadData` 完成（Promise Resolved）后再执行 UI 注入，从根源上消除了数据竞争问题。
+- **Gemini: Shared Gem Detection**: 简化并加固了共享 Gem 的判定逻辑。
+  - **优先级 1**: URL 包含 `usp=sharing` (绝对真理，立即显示按钮)。
+  - **优先级 2**: Session Storage 有记录且 ID 匹配 (应对 URL 清洗)。
+  - **移除**: 删除了之前版本中不稳定的“自动清理 Session”逻辑，防止在页面跳转间隙丢失状态。
+  - **兜底**: 如果以上两者皆无，强制判定为非共享链接，杜绝了在个人 Gem 页面误显示固定按钮的现象。
+
 ## [3.0.0.31] - 2026-02-03
 ### Improved
 - **Gemini: Responsive Sidebar**: 实现了“响应式折叠模式”。当 Gemini 侧边栏收起（变窄）时，插件 UI 会自动隐藏所有文字标签（标题、列表项名），仅保留图标，从而解决“字儿漏出来”的溢出问题，同时保持功能可用。
