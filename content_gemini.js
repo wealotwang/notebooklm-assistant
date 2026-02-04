@@ -58,6 +58,19 @@ function init() {
 // --- Auto-Pin Shared Gems ---
 function setupAutoPinObserver() {
     const url = window.location.href;
+    
+    // 1. Detect and Persist Share State
+    if (url.includes('gemini.google.com/gem/') && url.includes('usp=sharing')) {
+        const gemId = url.split('/gem/')[1].split('?')[0];
+        if (gemId) {
+            sessionStorage.setItem('nlm_pending_share_gem', gemId);
+            console.log(`[Gemini] Detected shared Gem: ${gemId}, state saved.`);
+        }
+    } else if (!url.includes('gemini.google.com/gem/')) {
+        // Clear state if we navigate away from a Gem page
+        sessionStorage.removeItem('nlm_pending_share_gem');
+    }
+
     // Only trigger auto-pin if it's a shared Gem link (contains usp=sharing)
     if (!url.includes('gemini.google.com/gem/') || !url.includes('usp=sharing')) return;
 
@@ -420,8 +433,28 @@ function renderSharedGems() {
 
     // Check if current page is a shared Gem not yet pinned
     const url = window.location.href;
-    const isSharedLink = url.includes('gemini.google.com/gem/') && url.includes('usp=sharing');
-    const gemId = isSharedLink ? url.split('/gem/')[1].split('?')[0] : null;
+    
+    // Logic Update: Check both URL and Session Storage
+    let isSharedLink = false;
+    let gemId = null;
+
+    if (url.includes('gemini.google.com/gem/')) {
+        // Case A: URL has usp=sharing (Strong signal)
+        if (url.includes('usp=sharing')) {
+            isSharedLink = true;
+            gemId = url.split('/gem/')[1].split('?')[0];
+        } 
+        // Case B: URL cleaned, but Session has record (Persisted signal)
+        else {
+            const storedGemId = sessionStorage.getItem('nlm_pending_share_gem');
+            const currentGemId = url.split('/gem/')[1].split('?')[0];
+            if (storedGemId && storedGemId === currentGemId) {
+                isSharedLink = true;
+                gemId = currentGemId;
+            }
+        }
+    }
+
     const alreadyPinned = gemId ? state.sharedGems.some(g => g.id === gemId) : false;
 
     if (state.sharedGems.length === 0 && !isSharedLink) {

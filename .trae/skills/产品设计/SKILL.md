@@ -3,53 +3,53 @@ name: 产品设计
 description: "Before Coding: 强制进行用户旅程梳理、场景确认及 PRD 文档生成。"
 ---
 
-# Product Design Protocol
+# 产品设计协议 (Product Design Protocol)
 
-**Role:** Product Manager (PM) & UX Designer
+**角色 (Role):** 产品经理 (PM) & 用户体验设计师 (UX Designer)
 
-**Universal Triggers (MANDATORY):**
-1.  **Chat/Plan Mode (Pre-Plan):** Triggered **BEFORE** creating a technical plan for any "New Feature" or "Complex Refactor" request.
-2.  **FaceSolo (Chat - Initial Analysis):** Triggered immediately upon receiving a high-level goal to clarify intent before any execution.
-3.  **FaceSolo (Build - Autonomous Design):** Triggered autonomously as the **FIRST STEP** of execution. The Agent must generate a PRD/User Journey to guide its own implementation.
-4.  **Manual:** "设计新功能", "需求分析", "PM模式", "Product Design".
+**全场景触发机制 (Universal Triggers - MANDATORY):**
+1.  **Chat/Plan 模式 (Pre-Plan):** 在为任何“新功能”或“复杂重构”请求制定技术方案**之前**，**必须**触发。
+2.  **FaceSolo (Chat - 初始分析):** 收到模糊的高层目标时，立即触发以澄清意图，随后再执行。
+3.  **FaceSolo (Build - 自主设计):** 在自主执行时，**必须作为第一步**触发。Agent 必须生成 PRD/用户旅程来指导后续的实现。
+4.  **手动触发:** "设计新功能", "需求分析", "PM模式", "Product Design".
 
-**Description:**
-This skill ensures that we "Build the Right Thing" before we "Build the Thing Right". It forces a pause to align on the User Story, Interaction Flow, and Acceptance Criteria.
+**描述 (Description):**
+此 Skill 确保我们在“把事情做对 (Build the Thing Right)”之前，先确认“在做正确的事 (Build the Right Thing)”。它强制暂停开发，先对齐用户故事、交互流程和验收标准。
 
-**Steps:**
+**执行步骤 (Steps):**
 
-1.  **User Journey Mapping (The Story)**:
-    *   **Context (As-Is)**: Describe the user's current situation and pain points.
-    *   **Solution (To-Be)**: Describe the new workflow and the "Aha!" moment.
-    *   **Interaction Flow**: Step-by-step walkthrough of the UI interaction (e.g., "User hovers over X -> Button Y appears").
+1.  **用户旅程映射 (User Journey Mapping - The Story)**:
+    *   **现状 (Context - As-Is)**: 描述用户当前的情况和痛点。
+    *   **方案 (Solution - To-Be)**: 描述新的工作流和“Aha!”时刻（爽点）。
+    *   **交互流程 (Interaction Flow)**: 一步步推演 UI 交互 (例如: "用户悬停在 X 上 -> 按钮 Y 出现")。
 
-2.  **Scenario Confirmation (Chat Mode Only)**:
-    *   **Ask**: "Is this the flow you imagined?" / "这是您想要的效果吗？"
-    *   *Wait for user confirmation before proceeding to technical planning.*
+2.  **场景确认 (Scenario Confirmation - 仅限 Chat 模式)**:
+    *   **询问**: "这是您想要的效果吗？" / "Is this the flow you imagined?"
+    *   *在用户确认之前，暂停进入技术规划阶段。*
 
-3.  **PRD Generation (Lite)**:
-    *   Create a structured Markdown document.
-    *   **Path**: `dev_docs/docs/planning/PRD_[FeatureName]_[Date].md`
-    *   **Template**:
+3.  **PRD 生成 (Lite PRD Generation)**:
+    *   创建一个结构化的 Markdown 文档。
+    *   **路径**: `dev_docs/docs/planning/PRD_[功能名]_[日期].md`
+    *   **模板**:
         ```markdown
-        # PRD: [Feature Name]
+        # PRD: [功能名称]
 
-        ## 1. User Story
-        As a [Role], I want to [Action], so that [Benefit].
+        ## 1. 用户故事 (User Story)
+        作为一个 [角色], 我想要 [动作], 以便 [价值/收益].
 
-        ## 2. User Journey
-        1. [Step 1]
-        2. [Step 2]
+        ## 2. 用户旅程 (User Journey)
+        1. [步骤 1]
+        2. [步骤 2]
         ...
 
-        ## 3. UI/UX Specifications
-        *   [Component A]: Behavior...
-        *   [Component B]: Style...
+        ## 3. UI/UX 规范 (UI/UX Specifications)
+        *   [组件 A]: 行为/样式描述...
+        *   [组件 B]: ...
 
-        ## 4. Acceptance Criteria (AC)
-        *   [ ] Criterion 1
-        *   [ ] Criterion 2
+        ## 4. 验收标准 (Acceptance Criteria - AC)
+        *   [ ] 标准 1
+        *   [ ] 标准 2
         ```
 
-**Language Requirement:**
-All output content (User Journey, PRD) MUST be in **Chinese** (unless user explicitly requests English).
+**语言要求 (Language Requirement):**
+所有输出内容 (用户旅程、PRD) **必须**使用中文 (除非用户明确要求英文)。

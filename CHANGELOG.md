@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.0.0.28] - 2026-02-03
+### Fixed
+- **Gemini: URL State Persistence**: 解决了 Gemini 加载后自动清洗 URL 参数导致“共享 Gem”检测失效的问题。现在只要检测到 `usp=sharing` 进入，插件会通过 Session Storage 保持状态，确保“+ 固定当前 Gem”按钮始终可用。
+
 ## [3.0.0.27] - 2026-02-03
 ### Improved
 - **Gemini: Onboarding UX**: 当共享 Gem 名字抓取失败或为无效名时，现在显示 **"📝 点击重命名"** 引导占位符，并使用斜体弱化显示，明确提示用户进行操作。

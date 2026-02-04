@@ -6,6 +6,18 @@
 
 ## 📅 核心演进时间轴
 
+### 🚀 Phase 3.5: 隐形状态的持久化 (State Persistence)
+**周期:** 2026-02-03 (v3.0.0.28)
+
+#### 1. 攻克 URL 清洗难题 (Fixing URL Cleaning)
+*   **挑战**: Gemini SPA 在加载后会自动清洗 URL（移除 `usp=sharing` 参数），导致插件仅依赖 URL 检测共享状态的逻辑失效。这使用户在打开共享链接后，插件 UI 却无任何反应。
+*   **破局**: 引入 **Session Storage 状态保持机制**。
+    *   **捕捉**: 插件在页面加载瞬间捕获 `usp=sharing` 信号，并将 Gem ID 存入 Session。
+    *   **持久化**: 即使 URL 随后变得“纯净”，渲染引擎也会读取 Session 记录，坚定地显示“+ 固定当前 Gem”按钮。
+    *   **自毁**: 一旦用户导航离开该 Gem，状态自动清除，确保逻辑的严谨性。
+
+---
+
 ### 🚀 Phase 3.4: 引导与适配的最后一公里 (Onboarding & Responsiveness)
 **周期:** 2026-02-03 (v3.0.0.27)
 
