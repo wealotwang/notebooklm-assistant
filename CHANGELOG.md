@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.0.0.29] - 2026-02-03
+### Fixed
+- **Gemini: Folder List Rendering**: 修复了刷新页面或路由切换时，文件夹列表（Folder List）因渲染时机问题导致“消失”或为空的 Bug。现在 UI 注入后会立即强制刷新数据，确保文件夹和共享 Gem 始终可见。
+
 ## [3.0.0.28] - 2026-02-03
 ### Fixed
 - **Gemini: URL State Persistence**: 解决了 Gemini 加载后自动清洗 URL 参数导致“共享 Gem”检测失效的问题。现在只要检测到 `usp=sharing` 进入，插件会通过 Session Storage 保持状态，确保“+ 固定当前 Gem”按钮始终可用。

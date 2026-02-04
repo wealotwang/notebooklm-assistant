@@ -393,9 +393,11 @@ function findSidebarNav() {
    // Bind Events
   container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    const name = prompt("新建文件夹名称:");
+    const name = prompt("请输入文件夹名称:");
     if (name) {
-      state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
+      const id = Date.now().toString();
+      state.folders.push({ id, name, type: 'user' });
+      state.fileMappings[id] = [];
       saveData();
       renderFolders();
     }
@@ -422,6 +424,9 @@ function findSidebarNav() {
       resizeObserver.observe(sidebarContainer);
   }
   
+  // CRITICAL FIX: Render data immediately after injection
+  // This ensures folders and shared gems appear even if injection happens 
+  // after the initial page load (e.g., during SPA navigation)
   renderSharedGems();
   renderFolders();
 }
