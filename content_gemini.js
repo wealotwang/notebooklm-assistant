@@ -14,67 +14,26 @@ let state = {
 
 // --- Initialization ---
 function init() {
-  DOMService.log("Init triggered (v3.0.0.34)");
-  
-  // 1. Immediate State Capture (Synchronous)
-  // MUST execute before any async operations to catch 'usp=sharing'
-  setupAutoPinObserver();
-  setupGlobalClickListener();
-
-  // 2. Start Data Loading (Async)
-  // We don't block UI injection on this, but we use a flag to track readiness.
-  let isDataLoaded = false;
-  loadData().then(() => {
-    isDataLoaded = true;
-    DOMService.log("Data loaded successfully.");
-    // If UI is already injected, refresh it now that we have data
-    if (document.querySelector('.nlm-folder-container')) {
-        renderSharedGems();
-        renderFolders();
-    }
+  loadData(() => {
+    startObserver();
+    setupGlobalClickListener();
+    setupAutoPinObserver();
+    
+    // Watch for URL changes (SPA)
+    let lastUrl = window.location.href;
+    setInterval(() => {
+        if (window.location.href !== lastUrl) {
+            lastUrl = window.location.href;
+            setupAutoPinObserver();
+        }
+    }, 2000);
   });
-
-  // 3. Start UI Injection (Parallel/Polled)
-  // We use the observer/polling immediately to find the sidebar
-  DOMService.log("Starting UI injection observers...");
-  injectFolderUI(); // Initial try
-  
-  // Watch for DOM changes to keep UI injected
-  const observer = new MutationObserver((mutations) => {
-      if (!document.querySelector('.nlm-folder-container')) {
-          injectFolderUI();
-      }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  
-  // Handle URL changes
-  let lastUrl = window.location.href;
-  new MutationObserver(() => {
-      const url = window.location.href;
-      if (url !== lastUrl) {
-          lastUrl = url;
-          setupAutoPinObserver();
-          renderSharedGems();
-      }
-  }).observe(document, {subtree: true, childList: true});
 }
 
 // --- Auto-Pin Shared Gems ---
 function setupAutoPinObserver() {
     const url = window.location.href;
-    
-    // Simplified Logic (v3.0.0.33):
-    // Only persist state if usp=sharing is explicitly present.
-    // We REMOVED the auto-cleanup logic that was causing state loss.
-    if (url.includes('gemini.google.com/gem/') && url.includes('usp=sharing')) {
-        const gemId = url.split('/gem/')[1].split('?')[0];
-        if (gemId) {
-            sessionStorage.setItem('nlm_pending_share_gem', gemId);
-            console.log(`[Gemini] Detected shared Gem: ${gemId}, state saved.`);
-        }
-    }
-    
-    // Only proceed with auto-pin logic if it's a shared link
+    // Only trigger auto-pin if it's a shared Gem link (contains usp=sharing)
     if (!url.includes('gemini.google.com/gem/') || !url.includes('usp=sharing')) return;
 
     const gemId = url.split('/gem/')[1].split('?')[0];
@@ -339,7 +298,7 @@ function findSidebarNav() {
       <ul class="nlm-folder-list" id="gemini-shared-gems-list"></ul>
     </div>
     <div class="nlm-folder-header">
-      <span>Chats 文件夹分类</span>
+      <span>文件夹分类</span>
       <div class="nlm-header-actions">
         <button class="nlm-add-btn" title="新建文件夹">+</button>
       </div>
@@ -396,38 +355,35 @@ function findSidebarNav() {
    // Bind Events
   container.querySelector('.nlm-add-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    const name = prompt("请输入文件夹名称:");
+    const name = prompt("新建文件夹名称:");
     if (name) {
-      const id = Date.now().toString();
-      state.folders.push({ id, name, type: 'user' });
-      state.fileMappings[id] = [];
+      state.folders.push({ id: Date.now().toString(), name: name, type: 'user' });
       saveData();
       renderFolders();
     }
   });
 
-  // Auto-hide/collapse logic (Sidebar Squeeze Fix)
+  // Auto-hide on collapse (Sidebar Squeeze Fix)
+  // We observe the parent of the container (which is inside the sidebar)
+  // Or the grand-parent if needed. 
+  // Gemini sidebar usually collapses by reducing width.
   const sidebarContainer = targetElement.parentElement;
   if (sidebarContainer) {
       const resizeObserver = new ResizeObserver(entries => {
           for (let entry of entries) {
               // Gemini collapsed sidebar is usually very narrow (e.g. 72px or 80px)
+              // Expanded is usually > 200px.
               // We pick a safe threshold, e.g. 150px.
-              // Instead of hiding (display:none), we toggle a class for responsive styling
               if (entry.contentRect.width < 150) {
-                  container.classList.add('sidebar-collapsed');
+                  container.style.display = 'none';
               } else {
-                  container.classList.remove('sidebar-collapsed');
+                  container.style.display = 'block';
               }
           }
       });
       resizeObserver.observe(sidebarContainer);
   }
   
-  // CRITICAL FIX: Render data immediately after injection
-  // This ensures folders and shared gems appear even if injection happens 
-  // after the initial page load (e.g., during SPA navigation)
-  DOMService.log("Forcing initial render after injection...");
   renderSharedGems();
   renderFolders();
 }
@@ -439,36 +395,8 @@ function renderSharedGems() {
 
     // Check if current page is a shared Gem not yet pinned
     const url = window.location.href;
-    
-    // Logic Update (v3.0.0.33): Check both URL and Session Storage
-    // PRIORITY 1: URL has usp=sharing (Absolute Truth)
-    // PRIORITY 2: Session has record (Persisted Truth for Cleaned URLs)
-    let isSharedLink = false;
-    let gemId = null;
-
-    if (url.includes('gemini.google.com/gem/')) {
-        // Case A: URL has usp=sharing (Strongest Signal)
-        if (url.includes('usp=sharing')) {
-            isSharedLink = true;
-            gemId = url.split('/gem/')[1].split('?')[0];
-        } 
-        // Case B: URL cleaned, but Session has record
-        else {
-            const storedGemId = sessionStorage.getItem('nlm_pending_share_gem');
-            const currentGemId = url.split('/gem/')[1].split('?')[0];
-            // STRICT CHECK: Only if session matches current page ID
-            if (storedGemId && storedGemId === currentGemId) {
-                isSharedLink = true;
-                gemId = currentGemId;
-            }
-        }
-    }
-
-    // STRICT SAFETY NET: If we still think it's a shared link, but we have NO proof
-    // (no URL param AND no session match), then force it to false.
-    // This prevents "ghost" buttons on your own Gems.
-    if (isSharedLink && !gemId) isSharedLink = false;
-
+    const isSharedLink = url.includes('gemini.google.com/gem/') && url.includes('usp=sharing');
+    const gemId = isSharedLink ? url.split('/gem/')[1].split('?')[0] : null;
     const alreadyPinned = gemId ? state.sharedGems.some(g => g.id === gemId) : false;
 
     if (state.sharedGems.length === 0 && !isSharedLink) {
@@ -514,16 +442,9 @@ function renderSharedGems() {
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';
         
-        let displayName = gem.name;
-        let isPlaceholder = false;
-        if (isInvalidName(displayName)) {
-            displayName = "📝 点击重命名";
-            isPlaceholder = true;
-        }
-
         li.innerHTML = `
             <svg class="nlm-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.76 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.93 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
-            <span class="nlm-folder-name" title="${gem.name}" style="${isPlaceholder ? 'font-style:italic; opacity:0.8;' : ''}">${displayName}</span>
+            <span class="nlm-folder-name" title="${gem.name}">${gem.name}</span>
             <div class="nlm-folder-actions">
               <button class="nlm-more-btn" title="更多操作">
                 <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -533,7 +454,6 @@ function renderSharedGems() {
 
         li.addEventListener('click', (e) => {
             if (e.target.closest('.nlm-more-btn')) return;
-            // If it's a placeholder, trigger rename directly? No, keep behavior consistent.
             window.location.href = gem.url;
         });
 
@@ -677,7 +597,6 @@ function enableRenaming(folderId, spanElement, currentName) {
 }
 
 function renderFolders() {
-  DOMService.log("Rendering folders", state.folders);
   const list = document.getElementById('gemini-folder-list');
   if (!list) return;
   list.innerHTML = '';
