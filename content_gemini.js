@@ -19,14 +19,39 @@ function init() {
     setupGlobalClickListener();
     setupAutoPinObserver();
     
-    // Watch for URL changes (SPA)
-    let lastUrl = window.location.href;
-    setInterval(() => {
-        if (window.location.href !== lastUrl) {
-            lastUrl = window.location.href;
-            setupAutoPinObserver();
+    // Check sidebar visibility immediately
+    const checkSidebar = () => {
+        const sidebar = document.querySelector('mat-sidenav-content, .gmat-sidenav-content, .navigation-container');
+        const parent = document.querySelector('.nlm-folder-container')?.parentElement;
+        if (parent && parent.offsetWidth < 150) {
+            document.querySelectorAll('.nlm-folder-container').forEach(el => el.style.display = 'none');
+        } else {
+            document.querySelectorAll('.nlm-folder-container').forEach(el => el.style.display = 'block');
         }
-    }, 2000);
+    };
+    
+    // Check immediately and after a short delay for SPA loading
+    checkSidebar();
+    setTimeout(checkSidebar, 1000);
+    setTimeout(checkSidebar, 3000);
+
+    // Watch for sidebar resize
+    const resizeObserver = new ResizeObserver((entries) => {
+        checkSidebar();
+    });
+    const sidebarContainer = document.querySelector('mat-sidenav-content, .gmat-sidenav-content, .navigation-container') || document.body;
+    resizeObserver.observe(sidebarContainer);
+
+    // Handle URL changes for auto-pinning shared gems
+    let lastUrl = window.location.href;
+    new MutationObserver(() => {
+        const url = window.location.href;
+        if (url !== lastUrl) {
+            lastUrl = url;
+            setupAutoPinObserver();
+            renderSharedGems();
+        }
+    }).observe(document, {subtree: true, childList: true});
   });
 }
 
@@ -298,7 +323,7 @@ function findSidebarNav() {
       <ul class="nlm-folder-list" id="gemini-shared-gems-list"></ul>
     </div>
     <div class="nlm-folder-header">
-      <span>文件夹分类</span>
+      <span>Chats 文件夹分类</span>
       <div class="nlm-header-actions">
         <button class="nlm-add-btn" title="新建文件夹">+</button>
       </div>
@@ -442,9 +467,16 @@ function renderSharedGems() {
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';
         
+        let displayName = gem.name;
+        let isPlaceholder = false;
+        if (isInvalidName(displayName)) {
+            displayName = "📝 点击重命名";
+            isPlaceholder = true;
+        }
+
         li.innerHTML = `
             <svg class="nlm-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.76 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.93 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
-            <span class="nlm-folder-name" title="${gem.name}">${gem.name}</span>
+            <span class="nlm-folder-name" title="${gem.name}" style="${isPlaceholder ? 'font-style:italic; opacity:0.8;' : ''}">${displayName}</span>
             <div class="nlm-folder-actions">
               <button class="nlm-more-btn" title="更多操作">
                 <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -454,6 +486,7 @@ function renderSharedGems() {
 
         li.addEventListener('click', (e) => {
             if (e.target.closest('.nlm-more-btn')) return;
+            // If it's a placeholder, trigger rename directly? No, keep behavior consistent.
             window.location.href = gem.url;
         });
 
