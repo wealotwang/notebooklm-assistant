@@ -19,29 +19,6 @@ function init() {
     setupGlobalClickListener();
     setupAutoPinObserver();
     
-    // Check sidebar visibility immediately
-    const checkSidebar = () => {
-        const sidebar = document.querySelector('mat-sidenav-content, .gmat-sidenav-content, .navigation-container');
-        const parent = document.querySelector('.nlm-folder-container')?.parentElement;
-        if (parent && parent.offsetWidth < 150) {
-            document.querySelectorAll('.nlm-folder-container').forEach(el => el.style.display = 'none');
-        } else {
-            document.querySelectorAll('.nlm-folder-container').forEach(el => el.style.display = 'block');
-        }
-    };
-    
-    // Check immediately and after a short delay for SPA loading
-    checkSidebar();
-    setTimeout(checkSidebar, 1000);
-    setTimeout(checkSidebar, 3000);
-
-    // Watch for sidebar resize
-    const resizeObserver = new ResizeObserver((entries) => {
-        checkSidebar();
-    });
-    const sidebarContainer = document.querySelector('mat-sidenav-content, .gmat-sidenav-content, .navigation-container') || document.body;
-    resizeObserver.observe(sidebarContainer);
-
     // Handle URL changes for auto-pinning shared gems
     let lastUrl = window.location.href;
     new MutationObserver(() => {
@@ -403,27 +380,6 @@ function findSidebarNav() {
     }
   });
 
-  // Auto-hide on collapse (Sidebar Squeeze Fix)
-  // We observe the parent of the container (which is inside the sidebar)
-  // Or the grand-parent if needed. 
-  // Gemini sidebar usually collapses by reducing width.
-  const sidebarContainer = targetElement.parentElement;
-  if (sidebarContainer) {
-      const resizeObserver = new ResizeObserver(entries => {
-          for (let entry of entries) {
-              // Gemini collapsed sidebar is usually very narrow (e.g. 72px or 80px)
-              // Expanded is usually > 200px.
-              // We pick a safe threshold, e.g. 150px.
-              if (entry.contentRect.width < 150) {
-                  container.style.display = 'none';
-              } else {
-                  container.style.display = 'block';
-              }
-          }
-      });
-      resizeObserver.observe(sidebarContainer);
-  }
-  
   // CRITICAL FIX: Render data immediately after injection
   // This ensures folders and shared gems appear even if injection happens 
   // after the initial page load (e.g., during SPA navigation)
