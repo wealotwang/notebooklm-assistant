@@ -14,38 +14,49 @@ let state = {
 
 // --- Initialization ---
 function init() {
-  DOMService.log("Init triggered (v3.0.0.33)");
+  DOMService.log("Init triggered (v3.0.0.34)");
   
-  // 1. Data First: Wait for data to load before injecting UI
-  // This fixes the "empty folder list on refresh" bug
+  // 1. Immediate State Capture (Synchronous)
+  // MUST execute before any async operations to catch 'usp=sharing'
+  setupAutoPinObserver();
+  setupGlobalClickListener();
+
+  // 2. Start Data Loading (Async)
+  // We don't block UI injection on this, but we use a flag to track readiness.
+  let isDataLoaded = false;
   loadData().then(() => {
-    DOMService.log("Data loaded, starting UI injection...");
-    
-    // Initial injection
-    injectFolderUI();
-    
-    // Watch for DOM changes to keep UI injected
-    const observer = new MutationObserver((mutations) => {
-        if (!document.querySelector('.nlm-folder-container')) {
-            injectFolderUI();
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    setupGlobalClickListener();
-    setupAutoPinObserver();
-    
-    // Handle URL changes
-    let lastUrl = window.location.href;
-    new MutationObserver(() => {
-        const url = window.location.href;
-        if (url !== lastUrl) {
-            lastUrl = url;
-            setupAutoPinObserver();
-            renderSharedGems();
-        }
-    }).observe(document, {subtree: true, childList: true});
+    isDataLoaded = true;
+    DOMService.log("Data loaded successfully.");
+    // If UI is already injected, refresh it now that we have data
+    if (document.querySelector('.nlm-folder-container')) {
+        renderSharedGems();
+        renderFolders();
+    }
   });
+
+  // 3. Start UI Injection (Parallel/Polled)
+  // We use the observer/polling immediately to find the sidebar
+  DOMService.log("Starting UI injection observers...");
+  injectFolderUI(); // Initial try
+  
+  // Watch for DOM changes to keep UI injected
+  const observer = new MutationObserver((mutations) => {
+      if (!document.querySelector('.nlm-folder-container')) {
+          injectFolderUI();
+      }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Handle URL changes
+  let lastUrl = window.location.href;
+  new MutationObserver(() => {
+      const url = window.location.href;
+      if (url !== lastUrl) {
+          lastUrl = url;
+          setupAutoPinObserver();
+          renderSharedGems();
+      }
+  }).observe(document, {subtree: true, childList: true});
 }
 
 // --- Auto-Pin Shared Gems ---
