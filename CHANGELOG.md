@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0.26] - 2026-02-03
+### Added
+- **Gemini: Rename Feature**: 共享 Gem 的右键菜单中新增 **“重命名”** 选项，允许用户自定义 Gem 名称。
+- **Gemini: Smart Manual Pin**: 点击“固定当前 Gem”时会弹出输入框（预填探测到的名称），确保用户在固定前确认名称准确性。
+
+### Changed
+- **Gemini: UI Style Restoration**: 恢复了 v3.0.0.24 备受好评的**原生胶囊 (Capsule)** 样式。
+  - 大圆角 (`100px`) 列表项，左右留白。
+  - Google 风格的浅灰悬停背景，与 Gemini 原生侧边栏完美融合。
+- **Gemini: Name Filtering**: 增强了自动抓取逻辑，强制屏蔽 "Chats" 和 "Chat" 等无效名称，避免垃圾数据污染列表。
+
 ## [3.0.0.25] - 2026-02-03
 ### Fixed
 - **Gemini: Shared Gems Trigger Logic**: 现在仅在 URL 包含 `usp=sharing` 时才会触发自动固定逻辑，解决了新建/保存普通 Gem 时误触发的问题。

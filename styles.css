@@ -278,68 +278,161 @@
       background-color: rgba(0, 0, 0, 0.04); /* 轻微高亮，提示可点击 */
   }
 
-  /* 确保 Gemini 页面上的 z-index 足够高 */
-.nlm-folder-container.gemini-folder-container {
-    z-index: 900;
-    margin-bottom: 12px; /* Reduced to save space */
-    margin-top: 4px;     /* Reduced to save space */
-    padding: 0 12px;     /* Match Gemini sidebar padding */
-    max-height: none !important; /* Force all content to show */
-    overflow: visible !important;
-}
+  /* 4. Gemini 侧边栏原生风格复刻 (Native Style) */
 
-/* 共享 Gem 列表特有样式：改为垂直列表而非胶囊 */
-#gemini-shared-gems-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+/* 1. 容器：控制整体布局 */
+.nlm-folder-container.gemini-folder-container {
+    margin-top: 12px;
+    margin-bottom: 12px;
+    padding: 0; /* 原生容器本身通常没有 padding */
+    z-index: 900;
+    font-family: "Google Sans", "Helvetica Neue", sans-serif;
     max-height: none !important;
     overflow: visible !important;
 }
 
-#gemini-shared-gems-list .nlm-folder-item {
-    border-radius: 8px; /* Less rounded for list look */
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px 12px;
-    background-color: transparent;
-    border: 1px solid transparent;
-}
-
-#gemini-shared-gems-list .nlm-folder-item:hover {
-    background-color: rgba(60, 64, 67, 0.08);
-}
-
-/* Gemini Sidebar Tweaks */
+/* 2. 标题：复刻 .title-container h1.title */
 .gemini-folder-container .nlm-folder-header {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    color: #444746; 
-    margin-bottom: 8px;
+    line-height: 20px;
+    color: #444746;
+    padding: 8px 12px 8px 24px; /* 左侧留出 24px 间距对齐 Chats */
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.1px;
 }
 
-/* Dark Mode Support for Gemini */
-body.dark-theme .gemini-folder-container .nlm-folder-header,
-body[data-theme="dark"] .gemini-folder-container .nlm-folder-header {
-    color: #e3e3e3;
+/* 3. 列表容器 */
+.gemini-folder-container .nlm-folder-list,
+#gemini-shared-gems-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: none !important;
+    overflow: visible !important;
 }
 
-body.dark-theme .gemini-folder-container .nlm-folder-item,
-body[data-theme="dark"] .gemini-folder-container .nlm-folder-item {
-    color: #e3e3e3;
+/* 4. 列表项：复刻 a.conversation */
+.gemini-folder-container .nlm-folder-item {
+    display: flex;
+    align-items: center;
+    position: relative;
+    
+    /* 胶囊形状关键样式 */
+    height: 32px;
+    margin: 0 12px;
+    padding: 0 12px;
+    border-radius: 100px;   /* 全圆角 (Pill shape) */
+    border: none;
+    
+    font-size: 14px;
+    font-weight: 400;
+    color: #1f1f1f;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.1s linear;
     background-color: transparent;
+    box-sizing: border-box;
+    width: auto;
 }
 
-body.dark-theme .gemini-folder-container .nlm-folder-item:hover,
-body[data-theme="dark"] .gemini-folder-container .nlm-folder-item:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+/* 悬停效果 */
+.gemini-folder-container .nlm-folder-item:hover {
+    background-color: rgba(68, 71, 70, 0.08); /* Google 灰色悬停 */
+    box-shadow: none;
+    border: none;
 }
 
-body.dark-theme .gemini-folder-container .nlm-folder-item.active,
-body[data-theme="dark"] .gemini-folder-container .nlm-folder-item.active {
-    background-color: #004a77; /* Darker blue for active state */
-    color: #a8c7fa;
+/* 激活/选中状态 */
+.gemini-folder-container .nlm-folder-item.active {
+    background-color: #d3e3fd; /* 浅蓝色背景 */
+    color: #041e49;            /* 深蓝色文字 */
+    font-weight: 500;
+    border: none;
 }
+
+/* 5. 图标与文字微调 */
+.gemini-folder-container .nlm-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    fill: currentColor;
+    opacity: 0.8;
+}
+
+.gemini-folder-container .nlm-folder-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 32px;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* 6. 操作按钮 (三个点) */
+.gemini-folder-container .nlm-folder-actions {
+    display: none;
+    align-items: center;
+}
+.gemini-folder-container .nlm-folder-item:hover .nlm-folder-actions {
+    display: flex;
+}
+.gemini-folder-container .nlm-more-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: inherit;
+    opacity: 0.7;
+    margin: 0;
+    padding: 0;
+}
+.gemini-folder-container .nlm-more-btn:hover {
+    background-color: rgba(0,0,0,0.1);
+    opacity: 1;
+}
+
+/* 固定按钮样式 */
+.gemini-folder-container .nlm-folder-item.pin-current-btn {
+    justify-content: center;
+    border: 1px dashed rgba(26, 115, 232, 0.5);
+    background-color: rgba(26, 115, 232, 0.02);
+    margin-bottom: 4px;
+    color: #1a73e8;
+}
+.gemini-folder-container .nlm-folder-item.pin-current-btn:hover {
+    background-color: rgba(26, 115, 232, 0.08);
+}
+
+/* Dark Mode Support */
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-header,
+body.dark-theme .gemini-folder-container .nlm-folder-header {
+    color: #e3e3e3;
+}
+
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item,
+body.dark-theme .gemini-folder-container .nlm-folder-item {
+    color: #c4c7c5;
+}
+
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item:hover,
+body.dark-theme .gemini-folder-container .nlm-folder-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+body[data-theme="dark"] .gemini-folder-container .nlm-folder-item.active,
+body.dark-theme .gemini-folder-container .nlm-folder-item.active {
+    background-color: #004a77;
+    color: #c2e7ff;
+}
+
+/* End Gemini Native Style */
 
 /* Dark Mode Modal */
 body.dark-theme .nlm-modal,

@@ -42,7 +42,7 @@ function setupAutoPinObserver() {
     const isInvalidName = (name) => {
         if (!name) return true;
         const lower = name.toLowerCase();
-        return lower === 'gemini' || lower === 'google gemini' || lower === 'untitled' || lower === 'loading...';
+        return lower === 'gemini' || lower === 'google gemini' || lower === 'untitled' || lower === 'loading...' || lower === 'chats' || lower === 'chat';
     };
 
     const updateGemName = (name) => {
@@ -419,10 +419,20 @@ function renderSharedGems() {
             <span style="font-weight: 500;">+ 固定当前 Gem</span>
         `;
         pinBtn.addEventListener('click', () => {
-            // Trigger the auto-pin logic manually
-            setupAutoPinObserver();
-            // Force a re-render after a short delay to show the new item
-            setTimeout(renderSharedGems, 1000);
+            // Trigger the auto-pin logic manually with PROMPT
+            // First, try to guess the name
+            let defaultName = document.title.replace('Google Gemini', '').replace('- Gemini', '').trim();
+            const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container, h1');
+            if (nameEl && nameEl.textContent.trim()) defaultName = nameEl.textContent.trim();
+            
+            if (defaultName.toLowerCase() === 'chats' || defaultName.toLowerCase() === 'gemini') defaultName = '';
+            
+            const name = prompt("请输入 Gem 名称:", defaultName);
+            if (name && name.trim()) {
+                state.sharedGems.push({ id: gemId, name: name.trim(), url: window.location.href });
+                saveData();
+                renderSharedGems();
+            }
         });
         list.appendChild(pinBtn);
     }
@@ -464,6 +474,10 @@ function showSharedGemMenu(event, gemId) {
     const menu = document.createElement('div');
     menu.className = 'nlm-context-menu';
     menu.innerHTML = `
+        <div class="nlm-context-menu-item rename">
+            <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            <span>重命名</span>
+        </div>
         <div class="nlm-context-menu-item delete">
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             <span>移除此共享 Gem</span>
@@ -476,6 +490,19 @@ function showSharedGemMenu(event, gemId) {
     menu.style.top = `${rect.bottom + 5}px`;
     menu.style.left = `${rect.left - 120}px`;
     menu.style.zIndex = '10000';
+
+    menu.querySelector('.rename').addEventListener('click', () => {
+        const gem = state.sharedGems.find(g => g.id === gemId);
+        if (gem) {
+            const newName = prompt("重命名 Gem:", gem.name);
+            if (newName && newName.trim()) {
+                gem.name = newName.trim();
+                saveData();
+                renderSharedGems();
+            }
+        }
+        menu.remove();
+    });
 
     menu.querySelector('.delete').addEventListener('click', () => {
         state.sharedGems = state.sharedGems.filter(g => g.id !== gemId);
