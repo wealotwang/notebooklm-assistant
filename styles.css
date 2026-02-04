@@ -289,7 +289,50 @@
     font-family: "Google Sans", "Helvetica Neue", sans-serif;
     max-height: none !important;
     overflow: visible !important;
+    transition: all 0.2s ease; /* Add transition for collapse */
 }
+
+/* 侧边栏折叠模式 (Collapsed Mode) */
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed {
+    padding: 0 4px; /* Tight padding */
+}
+
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-folder-header span,
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-header-actions,
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-folder-name,
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-folder-remove {
+    display: none !important;
+}
+
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-folder-header {
+    justify-content: center;
+    padding: 4px 0;
+    height: 0; /* Hide header completely to save space, or keep for spacing? */
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Special case: If we want to show the "+" button when collapsed? 
+   Currently hiding header completely as per user request ("不要展示相应的文字")
+   and visual cleanliness. Users can expand sidebar to manage folders. */
+
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-folder-item {
+    justify-content: center;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    margin: 2px auto;
+    border-radius: 50%; /* Circle icons */
+}
+
+.nlm-folder-container.gemini-folder-container.sidebar-collapsed .nlm-icon {
+    margin: 0;
+    width: 20px;
+    height: 20px;
+}
+
+/* End Collapsed Mode */
 
 /* 2. 标题：复刻 .title-container h1.title */
 .gemini-folder-container .nlm-folder-header {

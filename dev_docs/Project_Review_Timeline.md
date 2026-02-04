@@ -6,6 +6,23 @@
 
 ## 📅 核心演进时间轴
 
+### 🚀 Phase 3.8: 响应式折叠与稳健渲染 (Responsive Collapse & Robust Rendering)
+**周期:** 2026-02-03 (v3.0.0.31)
+
+#### 1. 响应式折叠模式 (Responsive Collapse Mode)
+*   **挑战**: 简单的“隐藏”策略在 Gemini 复杂的 SPA 环境下容易失效；而“始终显示”策略在侧边栏收起时会导致文字溢出，影响美观。
+*   **方案**: 引入智能类名切换 (`.sidebar-collapsed`)。
+    *   **JS 层**: 使用 `ResizeObserver` 实时监测侧边栏宽度。当宽度小于 150px 时，给容器添加折叠类。
+    *   **CSS 层**: 针对折叠状态，隐藏所有文字标签（Title, Item Name），仅保留图标，并调整 Padding。
+    *   **效果**: 实现了“收起即变图标栏”的原生级体验，既保留了功能入口，又彻底解决了文字溢出问题。
+
+#### 2. 渲染流程的终极加固 (Render Stability)
+*   **挑战**: 在路由切换或页面刷新时，UI 骨架注入成功但内容为空（幽灵列表）。这是因为数据渲染函数未能在所有注入场景下被触发。
+*   **修复**: 在 `injectFolderUI` 的生命周期末尾，增加**强制渲染指令**。无论 UI 是通过初始化还是 MutationObserver 注入，最后一步永远是 `renderSharedGems()` 和 `renderFolders()`。
+*   **调试**: 引入 `DOMService.log`，在渲染核心路径上输出关键数据状态，让未来的排查不再盲目。
+
+---
+
 ### 🚀 Phase 3.7: 战略性回退 (Strategic Rollback)
 **周期:** 2026-02-03 (v3.0.0.30)
 

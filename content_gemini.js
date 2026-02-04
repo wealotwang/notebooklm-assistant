@@ -380,9 +380,28 @@ function findSidebarNav() {
     }
   });
 
+  // Auto-hide/collapse logic (Sidebar Squeeze Fix)
+  const sidebarContainer = targetElement.parentElement;
+  if (sidebarContainer) {
+      const resizeObserver = new ResizeObserver(entries => {
+          for (let entry of entries) {
+              // Gemini collapsed sidebar is usually very narrow (e.g. 72px or 80px)
+              // We pick a safe threshold, e.g. 150px.
+              // Instead of hiding (display:none), we toggle a class for responsive styling
+              if (entry.contentRect.width < 150) {
+                  container.classList.add('sidebar-collapsed');
+              } else {
+                  container.classList.remove('sidebar-collapsed');
+              }
+          }
+      });
+      resizeObserver.observe(sidebarContainer);
+  }
+  
   // CRITICAL FIX: Render data immediately after injection
   // This ensures folders and shared gems appear even if injection happens 
   // after the initial page load (e.g., during SPA navigation)
+  DOMService.log("Forcing initial render after injection...");
   renderSharedGems();
   renderFolders();
 }
@@ -624,6 +643,7 @@ function enableRenaming(folderId, spanElement, currentName) {
 }
 
 function renderFolders() {
+  DOMService.log("Rendering folders", state.folders);
   const list = document.getElementById('gemini-folder-list');
   if (!list) return;
   list.innerHTML = '';
