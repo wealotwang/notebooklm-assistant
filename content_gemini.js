@@ -605,7 +605,7 @@ function renderFolders() {
     const li = document.createElement('li');
     li.className = `nlm-folder-item ${state.activeFolderId === folder.id ? 'active' : ''}`;
     
-    let iconPath = 'M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z';
+    let iconPath = 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z';
     if (folder.id === 'all') iconPath = 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z'; 
     
     let removeBtnHtml = folder.id !== 'all' ? `<span class="nlm-folder-remove" title="删除文件夹">×</span>` : '';
@@ -778,7 +778,7 @@ function injectMenuItem(menuNode) {
     btn.className = 'mat-mdc-menu-item mat-focus-indicator nlm-menu-item';
     btn.setAttribute('role', 'menuitem');
     btn.innerHTML = `
-        <mat-icon role="img" class="mat-icon notranslate material-icons mat-icon-no-color" aria-hidden="true">folder</mat-icon>
+        <svg class="nlm-menu-icon" viewBox="0 0 24 24" style="opacity: 0.7;"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
         <span class="mat-mdc-menu-item-text">Move to folder</span>
     `;
     
