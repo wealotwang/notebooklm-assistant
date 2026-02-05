@@ -474,27 +474,34 @@ function showSharedGemMenu(event, gemId) {
     const menu = document.createElement('div');
     menu.className = 'nlm-context-menu';
     menu.innerHTML = `
-        <div class="nlm-context-menu-item rename">
+        <button class="nlm-context-menu-item rename">
             <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             <span>重命名</span>
-        </div>
-        <div class="nlm-context-menu-item delete">
+        </button>
+        <button class="nlm-context-menu-item delete">
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            <span>移除此共享 Gem</span>
-        </div>
+            <span>移除</span>
+        </button>
     `;
 
     // Position menu near the button
-    const rect = event.target.closest('button').getBoundingClientRect();
+    const btn = event.target.closest('button');
+    const rect = btn.getBoundingClientRect();
+    
     menu.style.position = 'fixed';
-    menu.style.top = `${rect.bottom + 5}px`;
-    menu.style.left = `${rect.left - 120}px`;
+    
+    // Right-align logic: Menu Right Edge = Button Right Edge
+    const menuWidth = 210; 
+    const leftPos = rect.right - menuWidth; 
+
+    menu.style.top = `${rect.bottom + 4}px`; // 4px gap
+    menu.style.left = `${leftPos}px`;
     menu.style.zIndex = '10000';
 
     menu.querySelector('.rename').addEventListener('click', () => {
         const gem = state.sharedGems.find(g => g.id === gemId);
         if (gem) {
-            const newName = prompt("重命名 Gem:", gem.name);
+            const newName = prompt("Rename Gem:", gem.name);
             if (newName && newName.trim()) {
                 gem.name = newName.trim();
                 saveData();

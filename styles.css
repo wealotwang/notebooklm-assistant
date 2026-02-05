@@ -94,43 +94,81 @@
     fill: currentColor;
 }
 
-/* Context Menu */
+/* --- 像素级复刻 Gemini 原生 Context Menu --- */
 .nlm-context-menu {
     position: fixed;
-    background: white;
-    border-radius: 4px;
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,.30), 0 2px 6px 2px rgba(60,64,67,.15);
-    padding: 8px 0;
-    min-width: 160px;
+    /* Gemini 菜单背景色：带蓝灰调的浅色 */
+    background-color: #f0f4f9 !important; 
+    border-radius: 12px !important; 
+    /* 修正阴影：原生阴影非常淡且弥散，不使用深色 */
+    box-shadow: 0 4px 8px 3px rgba(60, 64, 67, 0.15), 0 1px 3px rgba(60, 64, 67, 0.3) !important;
+    padding: 8px 0 !important;
+    /* 修正宽度：原生其实很窄，改为 210px */
+    width: 210px !important; 
     z-index: 10000;
+    border: none !important;
+    font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+    min-width: 0 !important;
 }
 
 .nlm-context-menu-item {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 0 16px !important;
+    height: 36px !important; /* 降低高度，更精致 */
     cursor: pointer;
-    font-size: 14px;
-    color: #3c4043;
+    font-size: 14px !important; /* 原生字号 14px */
+    font-weight: 400 !important; 
+    color: #1f1f1f !important;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.1s linear;
+    box-sizing: border-box;
 }
 
 .nlm-context-menu-item:hover {
-    background-color: #f1f3f4;
+    background-color: rgba(31, 31, 31, 0.08) !important; 
 }
 
 .nlm-context-menu-item svg {
-    width: 18px;
-    height: 18px;
-    margin-right: 12px;
-    fill: #5f6368;
+    width: 18px !important; /* 减小图标尺寸 */
+    height: 18px !important;
+    margin-right: 12px !important; /* 图标文字间距 */
+    fill: #444746 !important; 
+    opacity: 0.9;
 }
 
+/* 危险操作（Remove）红色文字与图标同步 */
 .nlm-context-menu-item.delete {
-    color: #d93025;
+    color: #b3261e !important; 
 }
 
 .nlm-context-menu-item.delete svg {
-    fill: #d93025;
+    fill: #b3261e !important;
+}
+
+/* --- 深色模式精准适配 --- */
+body[data-theme="dark"] .nlm-context-menu,
+body.dark-theme .nlm-context-menu {
+    background-color: #2b2c2e !important;
+    box-shadow: 0 4px 8px 3px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+
+body[data-theme="dark"] .nlm-context-menu-item,
+body.dark-theme .nlm-context-menu-item {
+    color: #e3e3e3 !important;
+}
+
+body[data-theme="dark"] .nlm-context-menu-item:hover,
+body.dark-theme .nlm-context-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body[data-theme="dark"] .nlm-context-menu-item svg,
+body.dark-theme .nlm-context-menu-item svg {
+    fill: #c4c7c5 !important;
 }
 
 /* 选中状态 */
