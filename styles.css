@@ -569,29 +569,65 @@ body[data-theme="dark"] .nlm-timeline-dot:hover {
     cursor: grabbing;
   }
 
-/* --- 上下文菜单相关 --- */
-.nlm-menu-item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 0 16px;
-  height: 48px;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-family: Roboto, sans-serif;
-  font-size: 14px;
-  color: #3c4043;
-  cursor: pointer;
+/* --- 像素级对齐 Move to folder 菜单项 --- */
+
+/* 1. 按钮容器基础对齐 */
+.nlm-menu-item.mat-mdc-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    min-height: 48px !important; /* Gemini 原生高度 */
+    gap: 0 !important; /* 依靠 margin 控制间距 */
 }
-.nlm-menu-item:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
+
+/* 2. 复刻原生图标样式：纤细感和间距 */
 .nlm-menu-icon {
-  margin-right: 12px;
-  fill: currentColor;
-  width: 24px;
-  height: 24px;
+    /* 强制使用 Google Symbols 字体来保持粗细一致 */
+    font-family: 'Google Symbols' !important;
+    font-size: 20px !important; 
+    width: 24px !important;
+    height: 24px !important;
+    line-height: 24px !important;
+    margin-right: 12px !important; /* 原生图标到文字的间距 */
+    color: #444746 !important;
+    font-weight: 200 !important; /* 极细：复刻 Material Symbols 的纤细感 */
+    font-style: normal;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0 !important; /* Reset padding from previous fix */
+}
+
+/* 3. 复刻原生文字样式 */
+.nlm-menu-item .mat-mdc-menu-item-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.nlm-menu-item .gds-body-m {
+    font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 400 !important; /* 修正字体粗细 */
+    color: #1f1f1f !important;
+    letter-spacing: 0.25px;
+}
+
+/* 4. 修正对齐：如果还是觉得偏上/偏下，微调这个 margin */
+.nlm-menu-icon {
+    margin-top: -2px; 
+}
+
+/* 深色模式适配 */
+body[data-theme="dark"] .nlm-menu-item .gds-body-m,
+body.dark-theme .nlm-menu-item .gds-body-m {
+    color: #e3e3e3 !important;
+}
+
+body[data-theme="dark"] .nlm-menu-icon,
+body.dark-theme .nlm-menu-icon {
+    color: #c4c7c5 !important;
 }
 
 /* --- 选择文件夹弹窗 --- */

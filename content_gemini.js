@@ -826,11 +826,17 @@ function injectMenuItem(menuNode) {
     console.log("Injecting Gemini Menu Item...");
     
     const btn = document.createElement('button');
+    // Use native classes directly
     btn.className = 'mat-mdc-menu-item mat-focus-indicator nlm-menu-item';
     btn.setAttribute('role', 'menuitem');
+    
+    // Mimic native structure: mat-icon + span (mat-mdc-menu-item-text)
     btn.innerHTML = `
-        <svg class="nlm-menu-icon" viewBox="0 0 24 24" style="opacity: 0.7;"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-        <span class="mat-mdc-menu-item-text">Move to folder</span>
+        <mat-icon role="img" class="mat-icon notranslate gds-icon-l google-symbols mat-ligature-font mat-icon-no-color nlm-menu-icon" aria-hidden="true">folder</mat-icon>
+        <span class="mat-mdc-menu-item-text">
+            <span class="gds-body-m">Move to folder</span>
+        </span>
+        <div class="mat-ripple mat-mdc-menu-ripple"></div>
     `;
     
     btn.addEventListener('click', () => {
