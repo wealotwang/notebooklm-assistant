@@ -569,59 +569,75 @@ body[data-theme="dark"] .nlm-timeline-dot:hover {
     cursor: grabbing;
   }
 
-/* --- 像素级对齐 Move to folder 菜单项 --- */
+/* --- 像素级对齐修复：Move to folder --- */
 
-/* 1. 按钮容器基础对齐 */
 .nlm-menu-item.mat-mdc-menu-item {
     display: flex !important;
     align-items: center !important;
-    padding: 0 16px !important;
-    min-height: 48px !important; /* Gemini 原生高度 */
-    gap: 0 !important; /* 依靠 margin 控制间距 */
+    /* 1. 匹配原生高度与内边距 */
+    height: 32px !important; 
+    min-height: 32px !important;
+    padding: 0 12px !important; /* 匹配原生 0 12px */
+    margin: 0 !important;
+    
+    /* 2. 修正字体：确保不回落到 Arial */
+    font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    color: #1f1f1f !important;
+    border: none !important;
+    background: transparent !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
-/* 2. 复刻原生图标样式：纤细感和间距 */
+/* 3. 图标精准对齐 */
 .nlm-menu-icon {
-    /* 强制使用 Google Symbols 字体来保持粗细一致 */
+    /* 强制使用 Google Symbols 字体 */
     font-family: 'Google Symbols' !important;
     font-size: 20px !important; 
-    width: 24px !important;
-    height: 24px !important;
-    line-height: 24px !important;
-    margin-right: 12px !important; /* 原生图标到文字的间距 */
+    width: 20px !important; /* 原生图标通常占位 20px */
+    height: 20px !important;
+    line-height: 20px !important;
+    /* 关键：调整右边距以对齐文字 */
+    margin-right: 12px !important; 
     color: #444746 !important;
-    font-weight: 200 !important; /* 极细：复刻 Material Symbols 的纤细感 */
-    font-style: normal;
+    font-weight: 200 !important; /* 极细 */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    padding: 0 !important; /* Reset padding from previous fix */
+    padding: 0 !important;
+    margin-top: 0 !important; /* Reset previous offset */
 }
 
-/* 3. 复刻原生文字样式 */
+/* 4. 文字对齐修正 */
 .nlm-menu-item .mat-mdc-menu-item-text {
     flex: 1;
     display: flex;
     align-items: center;
+    padding: 0 !important; /* 移除额外间距 */
+    margin: 0 !important;
 }
 
 .nlm-menu-item .gds-body-m {
-    font-family: "Google Sans", Roboto, Arial, sans-serif !important;
-    font-size: 14px !important;
-    font-weight: 400 !important; /* 修正字体粗细 */
-    color: #1f1f1f !important;
-    letter-spacing: 0.25px;
+    line-height: 32px !important; /* 与容器高度保持一致 */
+    vertical-align: middle !important;
 }
 
-/* 4. 修正对齐：如果还是觉得偏上/偏下，微调这个 margin */
-.nlm-menu-icon {
-    margin-top: -2px; 
+/* 5. 修复与下方按钮的边距 */
+.nlm-menu-item + button.mat-mdc-menu-item {
+    margin-top: 0 !important;
 }
 
-/* 深色模式适配 */
-body[data-theme="dark"] .nlm-menu-item .gds-body-m,
-body.dark-theme .nlm-menu-item .gds-body-m {
+/* 悬停效果保持一致 */
+.nlm-menu-item.mat-mdc-menu-item:hover {
+    background-color: rgba(31, 31, 31, 0.08) !important;
+}
+
+/* 深色模式修正 */
+body[data-theme="dark"] .nlm-menu-item.mat-mdc-menu-item,
+body.dark-theme .nlm-menu-item.mat-mdc-menu-item {
     color: #e3e3e3 !important;
 }
 
