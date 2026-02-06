@@ -179,7 +179,31 @@ function loadData(callback) {
     }
 
     if (result.gemini_shared_gems) {
-      state.sharedGems = result.gemini_shared_gems;
+      // DATA CLEANING: Filter out invalid entries on load
+      const validGems = [];
+      const seenIds = new Set();
+      
+      result.gemini_shared_gems.forEach(gem => {
+          // 1. Basic Validity Check
+          if (!gem || !gem.id || !gem.name) return;
+          // 2. Name Validity Check (Reuse the same strict logic)
+          const name = gem.name.trim();
+          if (name === "" || name === "Gemini" || name === "抓取中..." || name === "正在读取...") return;
+          
+          // 3. Deduplication Check
+          if (seenIds.has(gem.id)) return;
+          
+          seenIds.add(gem.id);
+          validGems.push(gem);
+      });
+      
+      state.sharedGems = validGems;
+      
+      // If we cleaned something up, save it back immediately
+      if (validGems.length !== result.gemini_shared_gems.length) {
+          DOMService.log(`[Data-Clean] Removed ${result.gemini_shared_gems.length - validGems.length} invalid/duplicate gems.`);
+          saveData();
+      }
     } else {
       state.sharedGems = [];
     }
@@ -468,11 +492,18 @@ function renderSharedGems() {
     list.innerHTML = '';
 
     // 2. Render ONLY shared Gems that have a VALID name
+    // DEDUPLICATION: Use a Set to track rendered IDs to avoid visual duplicates
+    const renderedIds = new Set();
+
     state.sharedGems.forEach(gem => {
         // Strict Filter: Skip placeholders, loading states, and empty names.
         if (!gem.name || gem.name.trim() === "" || gem.name === "抓取中..." || gem.name === "正在读取..." || gem.name === "Gemini") {
             return;
         }
+
+        // DEDUPLICATION CHECK
+        if (renderedIds.has(gem.id)) return;
+        renderedIds.add(gem.id);
 
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';
