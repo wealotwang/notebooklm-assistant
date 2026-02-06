@@ -722,9 +722,13 @@ function setupGlobalClickListener() {
 
     // Gem Guard: If the button is inside the Gems list, ignore it.
     if (btn.closest('.gems-list-container') || btn.closest('[data-test-id="gems-list"]')) {
-         DOMService.log("GlobalListener: Ignored click on Gem item.");
+         DOMService.log("GlobalListener: Ignored click on Gem item (Container).");
+         state.lastClickedButton = null; // CRITICAL: Clear stale state
          return;
     }
+
+    // REMOVED: Strict Chat List check that was causing issues
+    // We default to "Allow" unless it's a Gem, to ensure Chats are captured.
 
     // Gem Guard (Link Check): If the associated link is a Gem link, ignore it.
     // Usually Gem links are like /app/gem/...
@@ -734,7 +738,8 @@ function setupGlobalClickListener() {
         if (!guardContainer) break;
         const link = guardContainer.querySelector('a[href^="/app/"]');
         if (link && link.getAttribute('href').includes('/gem/')) {
-             DOMService.log("GlobalListener: Ignored click on Gem link.");
+             DOMService.log("GlobalListener: Ignored click on Gem link (Href).");
+             state.lastClickedButton = null; // CRITICAL: Clear stale state
              return;
         }
         guardContainer = guardContainer.parentElement;
@@ -792,38 +797,46 @@ function setupGlobalClickListener() {
 }
 
 function injectMenuItem(menuNode) {
-  // 1. Context Guard: Find the button that triggered this menu
-  const triggerBtn = document.querySelector('button[aria-expanded="true"]');
-  if (triggerBtn) {
-      // Check if button is inside the Gems list
-      const isGemItem = triggerBtn.closest('.gems-list-container') || 
-                        triggerBtn.closest('[data-test-id="gems-list"]') ||
-                        triggerBtn.closest('.side-nav-entry-container');
-      
-      // Also check the link associated with this item
-      let isGemLink = false;
-      let container = triggerBtn.parentElement;
-      for (let i = 0; i < 5; i++) {
-          if (!container) break;
-          const link = container.querySelector('a[href*="/gem/"]');
-          if (link) {
-              isGemLink = true;
-              break;
-          }
-          container = container.parentElement;
-      }
+  // 1. 获取触发当前菜单的按钮
+  let triggerBtn = document.querySelector('button[aria-expanded="true"]');
+  
+  // Fallback: Use the last clicked button if querySelector fails
+  if (!triggerBtn && state.lastClickedButton) {
+      DOMService.log("injectMenuItem: querySelector failed, using state.lastClickedButton");
+      triggerBtn = state.lastClickedButton;
+  }
 
-      if (isGemItem || isGemLink) {
-           console.log("Gemini Extension: Blocking 'Move to folder' for Gem item.");
-           return;
-      }
+  if (!triggerBtn) {
+      DOMService.log("injectMenuItem: No trigger button found.");
+      return;
+  }
+
+  DOMService.log("injectMenuItem: Trigger button identified.", triggerBtn);
+
+  // 2. 精准拦截 Gem 逻辑
+  // A. 检查是否在明确的 Gems 列表容器内
+  const isInsideGemsList = triggerBtn.closest('.gems-list-container, [data-test-id="gems-list"]');
+  
+  // B. 检查按钮所在的“行”容器中是否包含 Gem 链接
+  // 我们只在 li 或特定的 conversation 容器范围内查找，避免误伤
+  const row = triggerBtn.closest('li, [role="listitem"], .conversation-container');
+  const hasGemLink = row && row.querySelector('a[href*="/gem/"]');
+
+  if (isInsideGemsList || hasGemLink) {
+       DOMService.log("Gemini Extension: Blocked injection - Identified as Gem item.");
+       return;
   }
 
   // menuNode is likely .conversation-actions-menu
   const content = menuNode.querySelector('.mat-mdc-menu-content');
-    if (!content || content.querySelector('.nlm-menu-item')) return;
+    if (!content) {
+        DOMService.log("injectMenuItem: No .mat-mdc-menu-content found.");
+        return;
+    }
     
-    console.log("Injecting Gemini Menu Item...");
+    if (content.querySelector('.nlm-menu-item')) return;
+    
+    DOMService.log("Injecting 'Move to folder' into Chats menu...");
     
     const btn = document.createElement('button');
     // Use native classes directly
