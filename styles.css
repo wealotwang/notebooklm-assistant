@@ -859,11 +859,20 @@ body[data-theme="dark"] .nlm-timeline-dot:hover {
     pointer-events: auto; /* Re-enable clicks on dots */
 }
 
-/* Adjust timeline tooltip for Gemini's dark mode if needed */
-body.dark-theme .nlm-timeline-tooltip,
-body[data-theme="dark"] .nlm-timeline-tooltip {
-    background-color: #333;
-    color: #fff;
-    border: 1px solid #555;
+/* Loading Spinner */
+.nlm-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1a73e8; /* Blue */
+  border-radius: 50%;
+  animation: nlm-spin 1s linear infinite;
+  display: inline-block;
+  margin-left: 0;
+}
+
+@keyframes nlm-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 

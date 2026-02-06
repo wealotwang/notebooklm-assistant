@@ -10,24 +10,40 @@ let state = {
   sharedGems: [],   // [{ id: string, name: string, url: string }]
   activeFolderId: 'all',
   currentMenuContext: null, // { id: string, title: string }
+  sessionRemovedGems: new Set() // Blacklist for current session
 };
 
 // --- Initialization ---
 function init() {
+  DOMService.log("Init triggered (v3.0.0.34-SyncFix)");
+  
+  // 1. Sync Logic (Capture state before URL changes)
+  setupAutoPinObserver();
+  setupGlobalClickListener();
+  
+  // 2. Async Data Load (Blocking UI until data is ready)
   loadData(() => {
-    startObserver();
-    setupGlobalClickListener();
-    setupAutoPinObserver();
-    
-    // Watch for URL changes (SPA)
-    let lastUrl = window.location.href;
-    setInterval(() => {
-        if (window.location.href !== lastUrl) {
-            lastUrl = window.location.href;
-            setupAutoPinObserver();
-        }
-    }, 2000);
+      DOMService.log("Data loaded. Starting UI observers...");
+      
+      // Try immediate injection if sidebar is already present
+      const nav = findSidebarNav();
+      if (nav) {
+          injectFolderUI(nav);
+      }
+
+      // Start persistent observer for SPA navigation
+      startObserver();
   });
+
+  // 3. Watch for URL changes (SPA)
+  let lastUrl = window.location.href;
+  setInterval(() => {
+      if (window.location.href !== lastUrl) {
+          lastUrl = window.location.href;
+          setupAutoPinObserver();
+          renderSharedGems(); // Re-check visibility on navigation
+      }
+  }, 2000);
 }
 
 // --- Auto-Pin Shared Gems ---
@@ -37,32 +53,67 @@ function setupAutoPinObserver() {
     if (!url.includes('gemini.google.com/gem/') || !url.includes('usp=sharing')) return;
 
     const gemId = url.split('/gem/')[1].split('?')[0];
-    DOMService.log(`[Name-Search] Started search for Gem: ${gemId}`);
+    
+    // Remember this Gem as a "Pending Share" in this session, 
+    // because Gemini often strips the 'usp=sharing' parameter quickly.
+    sessionStorage.setItem('nlm_pending_share_gem', gemId);
+    
+    DOMService.log(`[Name-Probe] Started search for Gem: ${gemId}`);
     
     const isInvalidName = (name) => {
-        if (!name) return true;
-        const lower = name.toLowerCase();
-        return lower === 'gemini' || lower === 'google gemini' || lower === 'untitled' || lower === 'loading...' || lower === 'chats' || lower === 'chat';
+        if (!name || typeof name !== 'string') return true;
+        const t = name.trim();
+        if (t.length === 0) return true;
+        const lower = t.toLowerCase();
+        const blacklist = ['gemini', 'google gemini', 'untitled', 'loading...', 'chats', 'chat', '📝 点击重命名'];
+        return blacklist.includes(lower) || t.includes('{{'); 
     };
 
     const updateGemName = (name) => {
-        if (isInvalidName(name)) return false;
+        const h1 = document.querySelector('h1');
+        // Targeted Angular Selector
+        const ngTitle = document.querySelector('.conversation-title.gds-title-m'); 
+        const animationBox = document.querySelector('.bot-name-container-animation-box');
         
+        let candidate = name;
+
+        // Priority Strategy: Angular Text > H1 > Animation Box
+        if (isInvalidName(candidate)) {
+            candidate = ngTitle ? ngTitle.innerText.trim() : 
+                       (h1 ? h1.innerText.trim() : 
+                       (animationBox ? animationBox.innerText.trim() : ''));
+        }
+        
+        if (isInvalidName(candidate)) {
+            candidate = document.title.replace('Google Gemini', '').replace('- Gemini', '').trim();
+        }
+
+        // Diagnostic Log
+        DOMService.log(`[Name-Probe] GemID: ${gemId} | Detected: "${candidate}" | Source: ${ngTitle ? 'ng-component' : 'fallback'}`);
+
+        if (isInvalidName(candidate)) return false; // Keep waiting
+
+        // State Sync & Deduplication
         const existingIdx = state.sharedGems.findIndex(g => g.id === gemId);
+        
         if (existingIdx >= 0) {
-            // Self-Correction: If current name is generic, update it
-            if (isInvalidName(state.sharedGems[existingIdx].name)) {
-                DOMService.log(`[Name-Search] Correcting name: ${state.sharedGems[existingIdx].name} -> ${name}`);
-                state.sharedGems[existingIdx].name = name;
+            const current = state.sharedGems[existingIdx];
+            if (isInvalidName(current.name)) {
+                DOMService.log(`[Name-Probe] SUCCESS: Updating placeholder -> "${candidate}"`);
+                state.sharedGems[existingIdx].name = candidate;
+                
+                // Deduplication: Remove any duplicates of this ID
+                state.sharedGems = state.sharedGems.filter((g, idx) => g.id !== gemId || idx === existingIdx);
+                
                 saveData();
                 renderSharedGems();
-                return true;
+                return true; // Stop observer
             }
-            return false; // Already have a good name
+            return true; 
         } else {
-            // New Pin
-            DOMService.log(`[Name-Search] Auto-pinning: ${name}`);
-            state.sharedGems.push({ id: gemId, name: name, url: url });
+            if (state.sessionRemovedGems?.has(gemId)) return true;
+            DOMService.log(`[Name-Probe] SUCCESS: New Pin added: "${candidate}"`);
+            state.sharedGems.push({ id: gemId, name: candidate, url: window.location.href });
             saveData();
             renderSharedGems();
             return true;
@@ -81,10 +132,8 @@ function setupAutoPinObserver() {
     }
 
     // 2. Continuous Observer
-    let attempts = 0;
+    const startTime = Date.now();
     const observer = new MutationObserver((mutations, obs) => {
-        attempts++;
-        
         // Strategy A: DOM elements
         const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container, h1');
         const nameFromDOM = nameEl ? nameEl.textContent.trim() : '';
@@ -92,17 +141,19 @@ function setupAutoPinObserver() {
         // Strategy B: Document Title (often updated by Gemini)
         const nameFromTitle = document.title.replace('Google Gemini', '').replace('- Gemini', '').trim();
 
+        // Check DOM first
         if (updateGemName(nameFromDOM)) {
             obs.disconnect();
             return;
         }
         
+        // Check Title
         if (updateGemName(nameFromTitle)) {
             obs.disconnect();
             return;
         }
 
-        if (attempts > 100) { // Stop after ~10-20 seconds
+        if (Date.now() - startTime > 30000) { // Stop after 30 seconds
             obs.disconnect();
             DOMService.log(`[Name-Search] Search timed out for ${gemId}`);
         }
@@ -393,12 +444,21 @@ function renderSharedGems() {
     const list = document.getElementById('gemini-shared-gems-list');
     if (!section || !list) return;
 
-    // Check if current page is a shared Gem not yet pinned
     const url = window.location.href;
-    const isSharedLink = url.includes('gemini.google.com/gem/') && url.includes('usp=sharing');
-    const gemId = isSharedLink ? url.split('/gem/')[1].split('?')[0] : null;
-    const alreadyPinned = gemId ? state.sharedGems.some(g => g.id === gemId) : false;
+    
+    // 1. Identify Current Gem and Shared Status
+    let isSharedLink = false;
+    let currentGemId = null;
+    
+    if (url.includes('gemini.google.com/gem/')) {
+        currentGemId = url.split('/gem/')[1].split('?')[0];
+        // It's a shared link if URL has params OR we saved it to session previously
+        if (url.includes('usp=sharing') || sessionStorage.getItem('nlm_pending_share_gem') === currentGemId) {
+            isSharedLink = true;
+        }
+    }
 
+    // 1. If no shared Gems at all AND not on a shared page, hide.
     if (state.sharedGems.length === 0 && !isSharedLink) {
         section.style.display = 'none';
         return;
@@ -407,38 +467,13 @@ function renderSharedGems() {
     section.style.display = 'block';
     list.innerHTML = '';
 
-    // 1. Add "Pin Current Gem" button if applicable
-    if (isSharedLink && !alreadyPinned) {
-        const pinBtn = document.createElement('li');
-        pinBtn.className = 'nlm-folder-item pin-current-btn';
-        pinBtn.style.border = '1px dashed #1a73e8';
-        pinBtn.style.color = '#1a73e8';
-        pinBtn.style.justifyContent = 'center';
-        pinBtn.style.marginBottom = '8px';
-        pinBtn.innerHTML = `
-            <span style="font-weight: 500;">+ 固定当前 Gem</span>
-        `;
-        pinBtn.addEventListener('click', () => {
-            // Trigger the auto-pin logic manually with PROMPT
-            // First, try to guess the name
-            let defaultName = document.title.replace('Google Gemini', '').replace('- Gemini', '').trim();
-            const nameEl = document.querySelector('.bot-name-container-animation-box, .bot-name-container, h1');
-            if (nameEl && nameEl.textContent.trim()) defaultName = nameEl.textContent.trim();
-            
-            if (defaultName.toLowerCase() === 'chats' || defaultName.toLowerCase() === 'gemini') defaultName = '';
-            
-            const name = prompt("请输入 Gem 名称:", defaultName);
-            if (name && name.trim()) {
-                state.sharedGems.push({ id: gemId, name: name.trim(), url: window.location.href });
-                saveData();
-                renderSharedGems();
-            }
-        });
-        list.appendChild(pinBtn);
-    }
-
-    // 2. Render all shared Gems
+    // 2. Render ONLY shared Gems that have a VALID name
     state.sharedGems.forEach(gem => {
+        // Strict Filter: Skip placeholders, loading states, and empty names.
+        if (!gem.name || gem.name.trim() === "" || gem.name === "抓取中..." || gem.name === "正在读取..." || gem.name === "Gemini") {
+            return;
+        }
+
         const li = document.createElement('li');
         li.className = 'nlm-folder-item';
         
@@ -465,6 +500,14 @@ function renderSharedGems() {
 
         list.appendChild(li);
     });
+
+    // 3. Final Check: If list is empty AND not on shared page, hide.
+    // If on shared page, keep empty list visible (shows Header) waiting for name.
+    if (list.children.length === 0 && !isSharedLink) {
+        section.style.display = 'none';
+    }
+    
+    DOMService.log(`[Render] Shared Gems count: ${list.children.length}`);
 }
 
 function showSharedGemMenu(event, gemId) {
@@ -512,6 +555,7 @@ function showSharedGemMenu(event, gemId) {
     });
 
     menu.querySelector('.delete').addEventListener('click', () => {
+        state.sessionRemovedGems.add(gemId); // Add to blacklist
         state.sharedGems = state.sharedGems.filter(g => g.id !== gemId);
         saveData();
         renderSharedGems();
